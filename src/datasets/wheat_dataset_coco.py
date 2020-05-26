@@ -1,3 +1,9 @@
+"""
+Source: https://github.com/PyTorchLightning/wheat/blob/master/src/utils/dataset.py
+
+Author: artgor
+"""
+
 import numpy as np
 from torch.utils.data import Dataset
 import pandas as pd
@@ -12,6 +18,7 @@ class WheatDataset(Dataset):
 
     def __init__(self,
                  dataframe: pd.DataFrame = None,
+                 debug: bool = False,
                  mode: str = 'train',
                  image_dir: str = '',
                  cfg: DictConfig = None,
@@ -32,9 +39,12 @@ class WheatDataset(Dataset):
         self.image_ids = os.listdir(self.image_dir) if self.df is None else self.df['image_id'].unique()
         self.transforms = transforms
 
+        if debug:
+            self.image_ids = self.image_ids[:32]
+
     def __getitem__(self, idx: int):
         image_id = self.image_ids[idx].split('.')[0]
-        # print(image_id)
+        print(image_id) if debug
         image = cv2.imread(f'{self.image_dir}/{image_id}.jpg', cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
 
