@@ -42,11 +42,24 @@ def get_valid_transforms():
     )
 
 
-class DatasetRetriever(Dataset):
+class WheatTrain(Dataset):
+    """
+    Wheat Dataset
+
+    Args:         
+        images_dir: directory with RGB inputs
+        masks_dir: directory with binary masks
+        labels_df: true labels (as polygons)  
+        img_size: the desired image size to resize to for prograssive learning
+        transforms: the name of transforms setfrom the transfroms dictionary  
+        debug: if True, runs debugging on a few images. Default: 'False'   
+        normalise: if True, normalise images. Default: 'True'
+
+    """
 
     def __init__(self, marking, image_ids, transforms=None, test=False):
         super().__init__()
-
+        self.images_dir = images_dir 
         self.image_ids = image_ids
         self.marking = marking
         self.transforms = transforms
@@ -85,11 +98,36 @@ class DatasetRetriever(Dataset):
 
     def load_image_and_boxes(self, index):
         image_id = self.image_ids[index]
-        image = cv2.imread(f'{TRAIN_ROOT_PATH}/{image_id}.jpg', cv2.IMREAD_COLOR)
+        image = cv2.imread(f'{self.image_dir}/{image_id}.jpg', cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
         image /= 255.0
         records = self.marking[self.marking['image_id'] == image_id]
         boxes = records[['x', 'y', 'w', 'h']].values
         boxes[:, 2] = boxes[:, 0] + boxes[:, 2]
         boxes[:, 3] = boxes[:, 1] + boxes[:, 3]
+
         return image, boxes
+
+
+DATA_ROOT_PATH = '../input/global-wheat-detection/test'
+
+class WheatTest(Dataset):
+
+    def __init__(self, image_ids, transforms=None):
+        super().__init__()
+        self.image_ids = image_ids
+        self.transforms = transforms
+
+    def __getitem__(self, index: int):
+        image_id = self.image_ids[index]
+        image = cv2.imread(f'{DATA_ROOT_PATH}/{image_id}.jpg', cv2.IMREAD_COLOR)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        image /= 255.0
+        if self.transforms:
+            sample = {'image': image}
+            sample = self.transforms(**sample)
+            image = sample['image']
+        return image, image_id
+
+    def __len__(self) -> int:
+        return self.image_ids.shape[0]

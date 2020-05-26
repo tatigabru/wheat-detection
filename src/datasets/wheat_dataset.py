@@ -1,5 +1,6 @@
 """
 Adapted from https://www.kaggle.com/pestipeti/pytorch-starter-fasterrcnn-train
+https://www.kaggle.com/nvnnghia/awesome-augmentation
 
 """
 import pandas as pd
@@ -26,27 +27,16 @@ from torch.utils.data.sampler import SequentialSampler
 from matplotlib import pyplot as plt
 
 
-def load_image(self, index):
-    # loads 1 image from dataset, returns img, original hw, resized hw
-    image_id = self.image_ids[index]
-    imgpath = f'{DIR_INPUT}/global-wheat-detection/train'
-    img = cv2.imread(f'{imgpath}/{image_id}.jpg', cv2.IMREAD_COLOR)
-    
-    assert img is not None, 'Image Not Found ' + imgpath
-    h0, w0 = img.shape[:2]  # orig hw
-    return img, (h0, w0), img.shape[:2]  # img, hw_original, hw_resized
-
-
 class WheatDataset(Dataset):
 
-    def __init__(self, dataframe, image_dir, transforms=None):
+    def __init__(self, dataframe, image_dir, img_size, transforms=None):
         super().__init__()
         
         self.df = dataframe
         self.image_ids = dataframe['image_id'].unique()
         self.image_ids = shuffle(self.image_ids)
         self.labels = [np.zeros((0, 5), dtype=np.float32)] * len(self.image_ids)
-        self.img_size = 1024
+        self.img_size = img_size
         im_w = 1024
         im_h = 1024
         for i, img_id in enumerate(self.image_ids):
@@ -114,3 +104,13 @@ class WheatDataset(Dataset):
 
     def __len__(self) -> int:
         return self.image_ids.shape[0]    
+    
+    def load_image(self, index):
+        # loads 1 image from dataset, returns img, original hw, resized hw
+        image_id = self.image_ids[index]
+        imgpath = f'{DIR_INPUT}/global-wheat-detection/train'
+        img = cv2.imread(f'{imgpath}/{image_id}.jpg', cv2.IMREAD_COLOR)
+        
+        assert img is not None, 'Image Not Found ' + imgpath
+        h0, w0 = img.shape[:2]  # orig hw
+        return img, (h0, w0), img.shape[:2]  # img, hw_original, hw_resized
