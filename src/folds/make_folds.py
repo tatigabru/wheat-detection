@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
-
+from ..configs import META_TRAIN
 
 def make_folds(train_df: pd.DataFrame) -> pd.DataFrame:
     bboxs = np.stack(train_df['bbox'].apply(lambda x: np.fromstring(x[1:-1], sep=',')))
@@ -27,7 +27,6 @@ def make_folds(train_df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__=='__main__':
-
-    train_df = pd.read_csv('../input/global-wheat-detection/train.csv')
+    train_df = pd.read_csv(META_TRAIN)
     df_folds  = make_folds(train_df)
-    df_folds.to_csv() 
+    df_folds.to_csv('folds.csv', index=False) 

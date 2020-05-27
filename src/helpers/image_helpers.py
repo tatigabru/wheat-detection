@@ -64,3 +64,25 @@ def preprocess_minmax(img: np.array) -> np.array:
     return img
 
 
+def plot_mixup_detection(subplots: Tuple[int] = (3, 3), ) -> plt.figure:
+
+    subplot_h, subplot_w = subplots
+
+    fig, ax = plt.subplots(subplot_h, subplot_w, figsize=(16, 6*subplot_h))
+
+    for i in range(subplot_h):
+        image, boxes = dataset.load_image_and_boxes(random.randint(0, dataset.image_ids.shape[0] - 1))
+        r_image, r_boxes = dataset.load_image_and_boxes(random.randint(0, dataset.image_ids.shape[0] - 1))
+        mixup_image = (image+r_image)/2
+
+        for box in boxes.astype(int):
+            cv2.rectangle(image,(box[0], box[1]),(box[2],  box[3]),(0, 0, 1), 3)
+            cv2.rectangle(mixup_image,(box[0], box[1]),(box[2],  box[3]),(0, 0, 1), 3)
+            
+        for box in r_boxes.astype(int):
+            cv2.rectangle(r_image,(box[0], box[1]),(box[2],  box[3]),(1, 0, 0), 3)
+            cv2.rectangle(mixup_image,(box[0], box[1]),(box[2],  box[3]),(1, 0, 0), 3)
+            
+        ax[i][0].imshow(image)
+        ax[i][1].imshow(r_image)
+        ax[i][2].imshow(mixup_image)

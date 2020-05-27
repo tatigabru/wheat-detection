@@ -15,13 +15,8 @@ import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2, ToTensor
 
 import torch
-import torchvision
 
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
-
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 from torch.utils.data.sampler import SequentialSampler
 
 from matplotlib import pyplot as plt
@@ -114,3 +109,35 @@ class WheatDataset(Dataset):
         assert img is not None, 'Image Not Found ' + imgpath
         h0, w0 = img.shape[:2]  # orig hw
         return img, (h0, w0), img.shape[:2]  # img, hw_original, hw_resized
+
+
+class WheatTestDataset(Dataset):
+
+    def __init__(self, dataframe, image_dir, transforms=None):
+        super().__init__()
+
+        self.image_ids = dataframe['image_id'].unique()
+        self.df = dataframe
+        self.image_dir = image_dir
+        self.transforms = transforms
+
+    def __getitem__(self, index: int):
+
+        image_id = self.image_ids[index]
+        records = self.df[self.df['image_id'] == image_id]
+
+        image = cv2.imread(f'{self.image_dir}/{image_id}.jpg', cv2.IMREAD_COLOR)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        image /= 255.0
+
+        if self.transforms:
+            sample = {
+                'image': image,
+            }
+            sample = self.transforms(**sample)
+            image = sample['image']
+
+        return image, image_id
+
+    def __len__(self) -> int:
+        return self.image_ids.shape[0]
