@@ -13,6 +13,7 @@ scheduler:
 
 model:
   type: EfficientNet
+  pretrained: True
   encoder: resnet34
   classes: 1
   encoder_weights: imagenet
