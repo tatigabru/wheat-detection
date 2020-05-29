@@ -5,6 +5,7 @@ CUR_DIR=$pwd
 DATA_DIR_LOC=data
 
 cd ..
+cd ..
 mkdir -p $DATA_DIR_LOC
 cd $DATA_DIR_LOC
 
