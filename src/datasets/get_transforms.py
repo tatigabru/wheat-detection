@@ -9,26 +9,51 @@ from matplotlib import pyplot as plt
 from PIL import Image
 from skimage.color import label2rgb
 from torchvision.transforms import (
-    Compose, Normalize, ToTensor)
+    Compose, Normalize, ToTensor)   
+from .. configs import IMG_SIZE
 
 
-def pad_x32(image, **kwargs):
-    h, w = image.shape[:2]
+def get_train_transforms():
+    return A.Compose(
+        [
+            A.RandomSizedCrop(min_max_height=(800, 800), height=1024, width=1024, p=0.5),
+            A.OneOf([
+                A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit= 0.2, 
+                                     val_shift_limit=0.2, p=0.9),
+                A.RandomBrightnessContrast(brightness_limit=0.2, 
+                                           contrast_limit=0.2, p=0.9),
+            ],p=0.9),
+            A.ToGray(p=0.01),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.Resize(height=512, width=512, p=1),
+            A.Cutout(num_holes=8, max_h_size=64, max_w_size=64, fill_value=0, p=0.5),
+            #ToTensorV2(p=1.0),
+        ], 
+        p=1.0, 
+        bbox_params=A.BboxParams(
+            format='pascal_voc',
+            min_area=0, 
+            min_visibility=0,
+            label_fields=['labels']
+        )
+    )
 
-    pad_h = np.ceil(h / 32) * 32 - h
-    pad_w = np.ceil(w / 32) * 32 - w
-
-    pad_h_top = int(np.floor(pad_h / 2))
-    pad_h_bot = int(np.ceil(pad_h / 2))
-    pad_w_top = int(np.floor(pad_w / 2))
-    pad_w_bot = int(np.ceil(pad_w / 2))
-
-    padding = ((pad_h_top, pad_h_bot), (pad_w_top, pad_w_bot), (0, 0))
-    padding = padding[:2] if image.ndim == 2 else padding
-    image = np.pad(image, padding, mode='constant', constant_values=0)
-
-    return image
-
+def get_valid_transforms():
+    return A.Compose(
+        [
+            A.Resize(height=512, width=512, p=1.0),
+            #ToTensorV2(p=1.0),
+        ], 
+        p=1.0, 
+        bbox_params=A.BboxParams(
+            format='pascal_voc',
+            min_area=0, 
+            min_visibility=0,
+            label_fields=['labels']
+        )
+    )
+    
 
 class TransfromsCfgs():
     def __init__(

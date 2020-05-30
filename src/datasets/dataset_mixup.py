@@ -14,34 +14,16 @@ import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2, ToTensor
 
 import torch
-import torchvision
-
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
-
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.sampler import SequentialSampler
 
 from matplotlib import pyplot as plt
 
 
-def get_valid_transforms():
-    return A.Compose(
-        [
-            A.Resize(height=512, width=512, p=1.0),
-            ToTensorV2(p=1.0),
-        ], 
-        p=1.0, 
-        bbox_params=A.BboxParams(
-            format='pascal_voc',
-            min_area=0, 
-            min_visibility=0,
-            label_fields=['labels']
-        )
-    )
+def collate_fn(batch):
+    return tuple(zip(*batch))
 
-
+    
 class WheatTrain(Dataset):
     """
     Wheat Dataset
@@ -51,7 +33,7 @@ class WheatTrain(Dataset):
         masks_dir: directory with binary masks
         labels_df: true labels (as polygons)  
         img_size: the desired image size to resize to for prograssive learning
-        transforms: the name of transforms setfrom the transfroms dictionary  
+        transforms: the name of transforms set from the transfroms dictionary  
         debug: if True, runs debugging on a few images. Default: 'False'   
         normalise: if True, normalise images. Default: 'True'
 
