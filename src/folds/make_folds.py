@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
-from ..configs import META_TRAIN
+from .. constants import META_TRAIN
 
 def make_folds(train_df: pd.DataFrame) -> pd.DataFrame:
     bboxs = np.stack(train_df['bbox'].apply(lambda x: np.fromstring(x[1:-1], sep=',')))

@@ -131,32 +131,81 @@ medium_augmentations = A.Compose([
                     A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1),                   
             ])
 
+alex_train = A.Compose([
+        A.RandomSizedCrop(min_max_height=(800, 800), height=1024, width=1024, p=0.5),
+        A.OneOf([
+            A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit=0.2,
+                                 val_shift_limit=0.2, p=0.9),
+            A.RandomBrightnessContrast(brightness_limit=0.2,
+                                       contrast_limit=0.2, p=0.9),
+        ], p=0.9),
+        #A.ToGray(p=0.01),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.Resize(height=our_image_size, width=our_image_size, p=1),
+        A.Cutout(num_holes=8, max_h_size=our_image_size // 8, max_w_size=our_image_size // 8, fill_value=0, p=0.5)
+    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
 
-hard_augmentations = A.Compose([
-                    A.RandomRotate90(),
-                    A.Transpose(),
+boxes_hard_augs = A.Compose([                    
+                    A.RandomSizedBBoxSafeCrop(height = our_image_size, width = our_image_size, erosion_rate=0.0, interpolation=1, always_apply=False, p=1.0),
+                    # Add occasion blur
+                    A.OneOf([A.GaussianBlur(), A.GaussNoise(), A.NoOp()]),
+
+                    # D4 Augmentations
+                    A.HorizontalFlip(p=0.5),
+                    A.VerticalFlip(p=0.5),
+                    A.RandomRotate90(p=0.5),
+                    A.Transpose(p=0.2),
+
+                    # Cutout
+                    A.Cutout(num_holes=8, max_h_size=our_image_size // 8, max_w_size=our_image_size // 8, fill_value=0, p=0.5),
+                    # Spatial-preserving augmentations:
+                    A.OneOf(
+                        [   A.RandomBrightnessContrast(brightness_by_max=True),
+                            A.CLAHE(),
+                            A.HueSaturationValue(),
+                            A.RGBShift(),
+                            A.RandomGamma(),                            
+                        ], p=0.9
+                    ),
+                    # Weather effects                    
+                    A.OneOf(
+                        [ A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1), 
+                          A.RandomShadow(),
+                          A.RandomRain(),
+                        ]
+                    ),                 
+            ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})           
+
+
+RandomSizedBBoxSafeCrop(height, width, erosion_rate=0.0, interpolation=1, always_apply=False, p=1.0)
+
+hard_augmentations = A.Compose([                    
                     A.RandomGridShuffle(),
                     A.ShiftScaleRotate(
-                        scale_limit=0.3, rotate_limit=7, border_mode=cv2.BORDER_CONSTANT, mask_value=0, value=0
+                        scale_limit=0.3, rotate_limit=0, border_mode=cv2.BORDER_CONSTANT, mask_value=0, value=0
                     ),
                     A.ElasticTransform(border_mode=cv2.BORDER_CONSTANT, alpha_affine=5, mask_value=0, value=0),
                     # Add occasion blur
                     A.OneOf([A.GaussianBlur(), A.GaussNoise(), A.IAAAdditiveGaussianNoise(), A.NoOp()]),
                     # D4 Augmentations
-                    A.OneOf([A.CoarseDropout(), A.MaskDropout(max_objects=10), A.NoOp()]),
+                    A.HorizontalFlip(p=0.5),
+                    A.VerticalFlip(p=0.5),
+                    A.RandomRotate90(p=0.5),
+                    A.Transpose(p=0.2),
+
+                    A.OneOf([A.CoarseDropout()),
                     # Spatial-preserving augmentations:
                     A.OneOf(
-                        [
-                            A.RandomBrightnessContrast(brightness_by_max=True),
+                        [   A.RandomBrightnessContrast(brightness_by_max=True),
                             A.CLAHE(),
                             A.HueSaturationValue(),
                             A.RGBShift(),
-                            A.RandomGamma(),
-                            A.NoOp(),
+                            A.RandomGamma(),                            
                         ]
                     ),
-                    # Weather effects
-                    A.OneOf([A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1), A.NoOp()]),                    
+                    # Weather effects                    
+                    A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1),                    
             ])           
 
 # dictionary of transforms
