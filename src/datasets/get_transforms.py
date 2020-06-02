@@ -13,22 +13,54 @@ from torchvision.transforms import (
 from .. configs import IMG_SIZE
 
 
+d4_geometric = [                       
+			    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, 
+                    interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, value=0, mask_value=0, p=0.5),
+                # D4 Group augmentations
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.5),
+                A.RandomRotate90(p=0.5),
+                A.Transpose(p=0.2),
+                # crop and resize  
+                A.RandomSizedCrop((IMG_SIZE-100, IMG_SIZE), IMG_SIZE, IMG_SIZE, w2h_ratio=1.0, 
+                                interpolation=cv2.INTER_LINEAR, always_apply=False, p=0.2),                   	      	
+                ]
+
+
+d4_tansforms = [# D4 Group augmentations
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.5),
+                A.RandomRotate90(p=0.5),
+                A.Transpose(p=0.5),                        
+			    ]
+
+
 def get_train_transforms():
     return A.Compose(
         [
-            A.RandomSizedCrop(min_max_height=(800, 800), height=1024, width=1024, p=0.5),
+            A.RandomSizedCrop(min_max_height=(800, 800), height=IMG_SIZE, width=IMG_SIZE, p=0.5),
+            A.Resize(height=IMG_SIZE, width=IMG_SIZE, p=1.0),
             A.OneOf([
                 A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit= 0.2, 
                                      val_shift_limit=0.2, p=0.9),
                 A.RandomBrightnessContrast(brightness_limit=0.2, 
                                            contrast_limit=0.2, p=0.9),
             ],p=0.9),
-            A.ToGray(p=0.01),
+
+            A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5),          
+            # noise                
+            A.OneOf([
+                    A.GaussNoise(p=0.5),                 
+                    A.RandomGamma(p=0.4),                    
+                ],p=0.7),
+
+            # D4 transforms
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
-            A.Resize(height=512, width=512, p=1),
-            A.Cutout(num_holes=8, max_h_size=64, max_w_size=64, fill_value=0, p=0.5),
-            #ToTensorV2(p=1.0),
+            A.RandomRotate90(p=0.5),
+            A.Transpose(p=0.2),
+            # Grid cutout
+            A.GridDropout(ratio = 0.3, unit_size_min = IMG_SIZE//50, unit_size_max = IMG_SIZE//10, random_offset = True, p = 0.3)
         ], 
         p=1.0, 
         bbox_params=A.BboxParams(
@@ -42,7 +74,7 @@ def get_train_transforms():
 def get_valid_transforms():
     return A.Compose(
         [
-            A.Resize(height=512, width=512, p=1.0),
+            A.Resize(height=IMG_SIZE, width=IMG_SIZE, p=1.0),
             #ToTensorV2(p=1.0),
         ], 
         p=1.0, 

@@ -49,7 +49,7 @@ class WheatDataset(Dataset):
         self.img_size = img_size
         self.transforms = transforms
         self.normalise = normalise
-        #self.test = test
+        
         ids = os.listdir(images_dir)
         self.image_ids = [s[:-4] for s in ids]
         # select a subset for the debugging
@@ -63,12 +63,11 @@ class WheatDataset(Dataset):
         # load image and boxes        
         image = cv2.imread(f'{TRAIN_DIR}/{image_id}.jpg', cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
-
         image, boxes = load_image_and_boxes(image_id)
 
         # there is only one class
         labels = torch.ones((boxes.shape[0],), dtype=torch.int64)
-        
+       
         target = {}
         target['boxes'] = boxes
         target['labels'] = labels

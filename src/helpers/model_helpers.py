@@ -20,6 +20,18 @@ def set_seed(seed: int=1234) -> None:
         torch.backends.cudnn.deterministic = True
 
 
+def fix_seeds_tf(seed: int=1234) -> None:
+    """
+    Fix all random seeds for reproductibility
+    for Tensorflow
+    """
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    os.environ['TF_DETERMINISTIC_OPS'] = str(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    
+
 def load_optim(optimizer: torch.optim, checkpoint_path: str, device: torch.device) -> torch.optim:
     """
     Load optimizer to continuer training
