@@ -157,7 +157,7 @@ boxes_hard_augs = A.Compose([
                     A.RandomRotate90(p=0.5),
                     A.Transpose(p=0.2),
 
-                    # Cutout
+                    # Cutout,p=0.5
                     A.Cutout(num_holes=8, max_h_size=our_image_size // 8, max_w_size=our_image_size // 8, fill_value=0, p=0.5),
                     # Spatial-preserving augmentations:
                     A.OneOf(
