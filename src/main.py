@@ -37,4 +37,3 @@ neptune.log_text('top questions', 'what is machine learning?')
 # replace this file with your own file from local machine
 neptune.log_artifact('folds/folds.csv')  
 
-#

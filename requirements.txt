@@ -1,4 +1,4 @@
-albumentations==0.4.3
+albumentations==0.4.5
 black>=19.10b0
 fire>=0.2.1
 kaggle>=1.5.6
@@ -15,4 +15,6 @@ scipy>=1.1.0
 segmentation-models-pytorch==0.1.0
 tensorflow == 1.15.2
 tqdm>=4.25.0 
-neptune-client
+neptune-client == 0.4.114
+numba
+psutil>=5.7.0

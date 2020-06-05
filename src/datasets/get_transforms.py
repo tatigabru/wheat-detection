@@ -13,31 +13,49 @@ from torchvision.transforms import (
 from .. configs import IMG_SIZE
 
 
-d4_geometric = [                       
-			    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, 
-                    interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, value=0, mask_value=0, p=0.5),
-                # D4 Group augmentations
-                A.HorizontalFlip(p=0.5),
-                A.VerticalFlip(p=0.5),
-                A.RandomRotate90(p=0.5),
-                A.Transpose(p=0.2),
-                # crop and resize  
-                A.RandomSizedCrop((IMG_SIZE-100, IMG_SIZE), IMG_SIZE, IMG_SIZE, w2h_ratio=1.0, 
-                                interpolation=cv2.INTER_LINEAR, always_apply=False, p=0.2),                   	      	
-                ]
-
-
-d4_tansforms = [# D4 Group augmentations
-                A.HorizontalFlip(p=0.5),
-                A.VerticalFlip(p=0.5),
-                A.RandomRotate90(p=0.5),
-                A.Transpose(p=0.5),                        
-			    ]
-
-
-def get_train_transforms():
+def get_transforms(augs: List):
     return A.Compose(
-        [
+        augs, 
+        p=1.0, 
+        bbox_params=A.BboxParams(
+            format='pascal_voc',
+            min_area=0, 
+            min_visibility=0,
+            label_fields=['labels']
+        )
+    ) 
+
+
+hard_augs = [             
+                    A.RandomSizedBBoxSafeCrop(height = IMG_SIZE, width = IMG_SIZE, erosion_rate=0.0, interpolation=1, always_apply=False, p=1.0),
+                    # Add occasion blur
+                    A.OneOf([A.GaussianBlur(), A.GaussNoise(), A.NoOp()]),
+                    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5),    
+                    # D4 Augmentations
+                    A.HorizontalFlip(p=0.5),
+                    A.VerticalFlip(p=0.5),
+                    A.RandomRotate90(p=0.5),
+                    A.Transpose(p=0.2),
+                    # Cutout,p=0.5
+                    A.Cutout(num_holes=8, max_h_size=IMG_SIZE // 8, max_w_size=IMG_SIZE // 8, fill_value=0, p=0.5),
+                    # Spatial-preserving augmentations:
+                    A.OneOf(
+                        [   A.RandomBrightnessContrast(brightness_by_max=True),
+                            A.HueSaturationValue(),
+                            A.RGBShift(),
+                            A.RandomGamma(),                            
+                        ], p=0.9
+                    ),
+                    # Weather effects                    
+                    A.OneOf(
+                        [ A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.2), 
+                          A.RandomRain( p=0.2),
+                        ]
+                    ),                 
+            ]   
+
+
+medium_augs = [
             A.RandomSizedCrop(min_max_height=(800, 800), height=IMG_SIZE, width=IMG_SIZE, p=0.5),
             A.Resize(height=IMG_SIZE, width=IMG_SIZE, p=1.0),
             A.OneOf([
@@ -46,8 +64,7 @@ def get_train_transforms():
                 A.RandomBrightnessContrast(brightness_limit=0.2, 
                                            contrast_limit=0.2, p=0.9),
             ],p=0.9),
-
-            A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5),          
+                  
             # noise                
             A.OneOf([
                     A.GaussNoise(p=0.5),                 
@@ -59,239 +76,49 @@ def get_train_transforms():
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
             A.Transpose(p=0.2),
-            # Grid cutout
-            A.GridDropout(ratio = 0.3, unit_size_min = IMG_SIZE//50, unit_size_max = IMG_SIZE//10, random_offset = True, p = 0.3)
-        ], 
-        p=1.0, 
-        bbox_params=A.BboxParams(
-            format='pascal_voc',
-            min_area=0, 
-            min_visibility=0,
-            label_fields=['labels']
-        )
-    )
 
-def get_valid_transforms():
-    return A.Compose(
-        [
-            A.Resize(height=IMG_SIZE, width=IMG_SIZE, p=1.0),
-            #ToTensorV2(p=1.0),
-        ], 
-        p=1.0, 
-        bbox_params=A.BboxParams(
-            format='pascal_voc',
-            min_area=0, 
-            min_visibility=0,
-            label_fields=['labels']
-        )
-    )
-    
+            # Cutout, p=0.5
+            A.Cutout(num_holes=8, max_h_size=IMG_SIZE // 8, max_w_size=IMG_SIZE // 8, fill_value=0, p=0.5),
+        ]   
 
-class TransfromsCfgs():
-    def __init__(
-        self,
-        img_size: tuple = (512, 512),   
-        augs_name: str = "valid"      
-        shift_limit: float=0.0625, 
-        scale_limit: float=0.3, 
-        rotate_limit: int=7,   
-        crop_size: tuple = (512, 512),    
-        hflip: bool = True,
-        vflip:bool = False,  
-        p: float = 0.5,
-        normalise: bool = True,
-    ):
-        super(TransfromsCfgs, self).__init__()  # inherit it from torch Dataset
-        self.img_size = img_size
-        self.augs_name = augs_name
-        self.shift_limit = shift_limit
-        self.scale_limit = scale_limit
-        self.rotate_limit = rotate_limit
-        self.crop_size = crop_size
-        self.p = p
-        self.normalise = normalise
-        
 
-    def get_transforms(self):
-        normalise = A.Normalize() 
+light_augs = [
+        A.RandomSizedCrop(min_max_height=(800, 800), height=1024, width=1024, p=0.5),
+        A.Resize(height=IMG_SIZE, width=IMG_SIZE, p=1),
+        A.OneOf([
+            A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit=0.2,
+                                 val_shift_limit=0.2, p=0.9),
+            A.RandomBrightnessContrast(brightness_limit=0.2,
+                                       contrast_limit=0.2, p=0.9),
+        ], p=0.9),
+        A.ToGray(p=0.01),
 
-        d4_tansforms = A.Compose([
-                        A.SmallestMaxSize(self.img_size, interpolation=0, p=1.),
-                        # D4 Group augmentations
-                        A.HorizontalFlip(p=0.5),
-                        A.VerticalFlip(p=0.5),
-                        A.RandomRotate90(p=0.5),
-                        A.Transpose(p=0.5),        
-                        A.Normalize(),
-			            ])
+        # D4 transforms
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
 
-        tensor_transform = Compose([
-                            ToTensor(),
-                            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                            ])
+        # Cutout,p=0.5
+        A.Cutout(num_holes=8, max_h_size=IMG_SIZE // 8, max_w_size=IMG_SIZE // 8, fill_value=0, p=0.5)
+        ]
 
-        d4_geometric = A.Compose([
-                                A.SmallestMaxSize(self.img_size, interpolation=0, p=1.),
-                                A.ShiftScaleRotate(shift_limit=self.shift_limit, self.scale_limit, rotate_limit=self.rotate_limit, 
-                                interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, value=0, mask_value=0, p=0.5),
-                                # D4 Group augmentations
-                                A.HorizontalFlip(p=0.5),
-                                A.VerticalFlip(p=0.5),
-                                A.RandomRotate90(p=0.5),
-                                A.Transpose(p=0.2),
-                                # crop and resize  
-                                A.RandomSizedCrop((self.crop_size[0], min(self.crop_size[1], self.img_size[0], self.img_size[1])), 
-                                                    self.img_size[0], self.img_size[1], w2h_ratio=1.0, 
-                                                    interpolation=cv2.INTER_LINEAR, always_apply=False, p=0.2),                 
-                                A.Normalize(),
-                                ])
 
-        resize_norm = A.Compose([
-                    A.SmallestMaxSize(IMG_SIZE, interpolation=0, p=1.),
-                    A.RandomCrop(self.img_size[0], self.img_size[1], p=1.), 
-                    A.Normalize(),
-                    ])        
+d4_augs = [
+        # D4 augmentations
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.Transpose(p=0.5),                        
+		]
 
-        geometric_transforms = A.Compose([
-                            A.SmallestMaxSize(self.img_size, interpolation=0, p=1.),
-                            A.ShiftScaleRotate(shift_limit=self.shift_limit, self.scale_limit, rotate_limit=self.rotate_limit, 
-                            interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, value=0, mask_value=0, p=0.5),
-                            A.RandomSizedCrop((self.crop_size[0], min(self.crop_size[1], self.img_size[0], self.img_size[1])), self.img_size[0], self.img_size[1]),
-                            # D4 Group augmentations
-                            A.HorizontalFlip(p=0.5),
-                            A.VerticalFlip(p=0.5),
-                            A.RandomRotate90(p=0.5),
-                            A.Transpose(p=0.2),                    
-                            A.Normalize(),
-                            ])
+resize = A.Resize(height=IMG_SIZE, width=IMG_SIZE, p=1.0)
 
-        train_light = A.Compose([
-                            A.SmallestMaxSize(self.img_size, interpolation=0, p=1.),
-                            A.RandomCrop(self.img_size[0], self.img_size[1], p=1.),
-                            A.HorizontalFlip(p=0.5),
-                            A.RandomBrightnessContrast(p=0.5),
-                            A.Normalize(),
-                            ])
+# dictionary of transforms
+TRANSFORMS = {
+    "d4": d4_augs,
+    "hard": hard_augs,
+    "medium": medium_augs,
+    "light": light_augs,
+    "resize": resize,     
+}
 
-        train_light_show = A.Compose([
-                            A.SmallestMaxSize(self.img_size, interpolation=0, p=1.),
-                            A.RandomCrop(self.img_size[0], self.img_size[1], p=1.),
-                            A.HorizontalFlip(p=0.5),
-                            A.RandomBrightnessContrast(p=0.5),                    
-                            ])
-
-        train_medium = A.Compose([
-                    A.SmallestMaxSize(self.img_size, interpolation=0, p=1.),
-                    A.RandomCrop(self.img_size[0], self.img_size[1], p=1.),
-                    A.HorizontalFlip(p=0.5),
-                    A.ShiftScaleRotate(shift_limit=self.shift_limit, self.scale_limit, rotate_limit=self.rotate_limit, p=0.5),
-                    A.OneOf(
-                        [
-                            A.RandomBrightnessContrast(p=0.7),
-                            A.Equalize(p=0.3),
-                            A.HueSaturationValue(p=0.5),
-                            A.RGBShift(p=0.5),
-                            A.RandomGamma(p=0.4),
-                            A.ChannelShuffle(p=0.05),
-                        ],
-                        p=0.9),
-                    A.OneOf([
-                        A.GaussNoise(p=0.5),
-                        A.ISONoise(p=0.5),
-                        A.MultiplicativeNoise(0.5),
-                    ], p=0.2),  
-                    A.Normalize(),         
-                ])
-
-        valid_ade = A.Compose([
-                    A.SmallestMaxSize(self.img_size, p=1.),
-                    A.Lambda(name="Pad32", image=pad_x32, mask=pad_x32),   
-                    A.Normalize(),         
-                ])       
-
-        # from bloodaxe 
-        # https://github.com/BloodAxe/Catalyst-Inria-Segmentation-Example/blob/master/inria/augmentations.py
-        crop_transform = A.Compose([ #(image_size: Tuple[int, int], min_scale=0.75, max_scale=1.25, input_size=5000):
-                A.OneOrOther(
-                A.RandomSizedCrop((self.crop_size[0], min(self.crop_size[1], self.img_size[0], self.img_size[1])), 
-                                   self.img_size[0], self.img_size[1]), 
-                A.CropNonEmptyMaskIfExists(self.img_size[0], self.img_size[1]),
-               ) 
-            ])
-
-        safe_augmentations = A.Compose([A.HorizontalFlip(), A.RandomBrightnessContrast(), A.Normalize()])
-
-        light_augmentations = A.Compose([
-                A.HorizontalFlip(),
-                A.RandomBrightnessContrast(),
-                A.OneOf([
-                    A.ShiftScaleRotate(scale_limit=self.scale_limit, rotate_limit=self.rotate_limit, border_mode=cv2.BORDER_CONSTANT),
-                    A.IAAAffine(),
-                    A.IAAPerspective(),
-                    A.NoOp()
-                ]),
-                A.HueSaturationValue(),
-                A.Normalize()
-            ])
-
-        medium_augmentations = A.Compose([
-                    A.HorizontalFlip(),
-                    A.ShiftScaleRotate(scale_limit=self.scale_limit, rotate_limit=self.rotate_limit, border_mode=cv2.BORDER_CONSTANT),
-                    # Add occasion blur/sharpening
-                    A.OneOf([A.GaussianBlur(), A.IAASharpen(), A.NoOp()]),
-                    # Spatial-preserving augmentations:
-                    A.OneOf([A.CoarseDropout(), A.MaskDropout(max_objects=5), A.NoOp()]),
-                    A.GaussNoise(),
-                    A.OneOf([A.RandomBrightnessContrast(), A.CLAHE(), A.HueSaturationValue(), A.RGBShift(), A.RandomGamma()]),
-                    # Weather effects
-                    A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1),
-                    A.Normalize(),
-            ])
-
-        hard_augmentations = A.Compose([
-                    A.RandomRotate90(),
-                    A.Transpose(),
-                    A.RandomGridShuffle(),
-                    A.ShiftScaleRotate(
-                        scale_limit=self.scale_limit, rotate_limit=self.rotate_limit, border_mode=cv2.BORDER_CONSTANT, mask_value=0, value=0
-                    ),
-                    A.ElasticTransform(border_mode=cv2.BORDER_CONSTANT, alpha_affine=5, mask_value=0, value=0),
-                    # Add occasion blur
-                    A.OneOf([A.GaussianBlur(), A.GaussNoise(), A.IAAAdditiveGaussianNoise(), A.NoOp()]),
-                    # D4 Augmentations
-                    A.OneOf([A.CoarseDropout(), A.MaskDropout(max_objects=10), A.NoOp()]),
-                    # Spatial-preserving augmentations:
-                    A.OneOf(
-                        [
-                            A.RandomBrightnessContrast(brightness_by_max=True),
-                            A.CLAHE(),
-                            A.HueSaturationValue(),
-                            A.RGBShift(),
-                            A.RandomGamma(),
-                            A.NoOp(),
-                        ]
-                    ),
-                    # Weather effects
-                    A.OneOf([A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1), A.NoOp()]),
-                    A.Normalize(),
-            ])   
-
-        TRANSFORMS = {
-                "d4": d4_tansforms,
-                "normalise": normalise,
-                "resize_norm": resize_norm,
-                "geometric": geometric_transforms,
-                "d4_geometric": d4_geometric,
-                "ade_light": train_light,
-                "ade_medium": train_medium,
-                "ade_valid": valid_ade,    
-                "ade_show": train_light_show,
-                "resize_norm": resize_norm,
-                "flip_bright": safe_augmentations,
-                "inria_light": light_augmentations,
-                "inria_medium": medium_augmentations,
-                "inria_hard": hard_augmentations,
-                "inria_valid": safe_augmentations,
-                }                   
-
-        return TRANSFORMS[self.augs_name]
