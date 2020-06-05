@@ -25,7 +25,7 @@ from effdet.efficientdet import HeadNet
 
 from .datasets.dataset import WheatDataset
 from .datasets.get_transforms import TRANSFORMS, get_transforms
-
+from metric import map_iou
 warnings.filterwarnings('ignore')
 
 sys.path.append("../timm-efficientdet-pytorch")
@@ -38,38 +38,6 @@ train_batch_size = 4
 inf_batch_size = 16
 our_image_size = 512
 
-train_boxes_df = pd.read_csv(META_TRAIN)
-
-train_boxes_df['x'] = -1
-train_boxes_df['y'] = -1
-train_boxes_df['w'] = -1
-train_boxes_df['h'] = -1
-
-def expand_bbox(x):
-    r = np.array(re.findall("([0-9]+[.]?[0-9]*)", x))
-    if len(r) == 0:
-        r = [-1, -1, -1, -1]
-    return r
-
-train_boxes_df[['x', 'y', 'w', 'h']] = np.stack(train_boxes_df['bbox'].apply(lambda x: expand_bbox(x)))
-train_boxes_df.drop(columns=['bbox'], inplace=True)
-train_boxes_df['x'] = train_boxes_df['x'].astype(np.float)
-train_boxes_df['y'] = train_boxes_df['y'].astype(np.float)
-train_boxes_df['w'] = train_boxes_df['w'].astype(np.float)
-train_boxes_df['h'] = train_boxes_df['h'].astype(np.float)
-
-train_boxes_df['area'] = train_boxes_df['w'] * train_boxes_df['h']
-area_filter = (train_boxes_df['area'] < 160000) & (train_boxes_df['area'] > 50)
-if False:
-    train_boxes_df = train_boxes_df[area_filter]
-else:
-    print('No filtering for boxes')
-
-train_images_df = pd.read_csv('folds.csv')
-
-def train_box_callback(image_id):
-    records = train_boxes_df[train_boxes_df['image_id'] == image_id]
-    return records[['x', 'y', 'w', 'h']].values
 
 def split_prediction_string(str):
     parts = str.split()
@@ -97,8 +65,6 @@ def set_lr(optimizer, new_lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = new_lr
 
-def load_weights(model, weights_file):
-    model.load_state_dict(torch.load(weights_file))
 
 class ModelManager():
     def __init__(self, model, device):
@@ -232,30 +198,47 @@ class ModelManager():
             self.best_lr_epoch = epoch
         return True
 
-def do_main():
+def main():
     #device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     device = "cuda:1"
     print(device)
 
-    print(len(train_boxes_df))
-    print(len(train_images_df))
+    train_boxes_df = pd.read_csv(META_TRAIN)
+    train_images_df = pd.read_csv('folds.csv')
 
-    # Leave only > 0
-    print('leavy only train images with boxes (all)')
-    with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
+    def train_box_callback(image_id):
+        records = train_boxes_df[train_boxes_df['image_id'] == image_id]
+        return records[['x', 'y', 'w', 'h']].values
+
+    fold_number = 0
+
+    train_dataset = WheatDataset(
+        image_ids=df_folds[df_folds['fold'] != fold_number].index.values,
+        marking=marking,
+        transforms=get_train_transforms(),
+        test=False,
+    )
+
+    validation_dataset = WheatDataset(
+        image_ids=df_folds[df_folds['fold'] == fold_number].index.values,
+        marking=marking,
+        transforms=get_valid_transforms(),
+        test=True,
+    )    
+
+
 
     fold_ = 1
     images_val = train_images_df.loc[
         (train_images_df[fold_column] == fold_) & with_boxes_filter, image_id_column].values
     images_train = train_images_df.loc[
         (train_images_df[fold_column] != fold_) & with_boxes_filter, image_id_column].values
-
     print(len(images_train), len(images_val))
 
-    train_dataset = WheatDataset(images_train, DIR_TRAIN, train_box_callback,
-                                 transforms=get_train_transform(), is_test=False)
-    valid_dataset = WheatDataset(images_val, DIR_TRAIN, train_box_callback,
-                                 transforms=get_valid_transform(), is_test=True)
+    train_dataset = WheatDataset(images_train, TRAIN_DIR, train_box_callback,
+                                 transforms=get_transform(TRANSFORMS["light"]), is_test=False)
+    valid_dataset = WheatDataset(images_val, TRAIN_DIR,, train_box_callback,
+                                 transforms=get_transform(TRANSFORMS["resize"]), is_test=True)
 
     train_data_loader = DataLoader(
         train_dataset,
@@ -273,15 +256,15 @@ def do_main():
         collate_fn=collate_fn
     )
 
-    config = get_efficientdet_config('tf_efficientdet_d5')
+    config = get_efficientdet_config('tf_efficientdet_d6')
     net = EfficientDet(config, pretrained_backbone=False)
-    load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d5-ef44aea8.pth')
+    load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d6-51cb0132.pth')
 
     config.num_classes = 1
     config.image_size = our_image_size
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
-    fold_weights_file = 'effdet.pth'
+    fold_weights_file = 'effdet6.pth'
     if os.path.exists(fold_weights_file):
         # continue training
         print('Continue training, loading weights: ' + fold_weights_file)
@@ -290,9 +273,9 @@ def do_main():
     model = DetBenchTrain(net, config)
 
     manager = ModelManager(model, device)
-    weights_file = 'effdet.pth'
+    weights_file = 'effdet6.pth'
     manager.run_train(train_data_loader, valid_data_loader, n_epoches=40, weights_file=weights_file,
                       factor=0.5, start_lr=2e-4, min_lr=1e-6, lr_patience=1, overall_patience=10, loss_delta=1e-4)
 
 if __name__ == '__main__':
-    do_main()
+    main()

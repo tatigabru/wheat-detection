@@ -100,32 +100,5 @@ def load_model(model: nn.Module, checkpoint_path: str) -> tuple:
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['model'])
     
-    return model, checkpoint
-    
-
-def load_net(checkpoint_path):
-    config = get_efficientdet_config('tf_efficientdet_d5')
-    net = EfficientDet(config, pretrained_backbone=False)
-
-    config.num_classes = 1
-    config.image_size = 512
-    net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
-
-    checkpoint = torch.load(checkpoint_path)
-    net.load_state_dict(checkpoint)
-
-    del checkpoint
-    gc.collect()
-    net = DetBenchEval(net, config)
-    net.eval()
-
-    return net.cuda()
-
-models = [
-    load_net('../input/effdet5-folds-mixup/fold0-best-v2.bin'),
-    load_net('../input/effdet5-folds-mixup/fold1-best-v2.bin'),
-    load_net('../input/effdet5-folds-mixup/fold2-best-v2.bin'),
-    load_net('../input/effdet5-folds-mixup/fold3-best-v2.bin'),
-    load_net('../input/effdet5-folds-mixup/fold4-best-v2.bin'),
-]
+    return model, checkpoint    
 

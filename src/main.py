@@ -5,7 +5,7 @@ import numpy as np
 neptune.__version__
 print(neptune.__version__)
 
-neptune.init('blonde/wheat')
+neptune.init('ods/wheat')
 
 # Define parameters
 PARAMS = {'decay_factor' : 0.5,

@@ -10,6 +10,7 @@ from numba import jit
 from typing import List, Union, Tuple, Optional
 from ..constants import TRAIN_DIR
 
+
 @jit(nopython=True)
 def calculate_iou(gt, pr, form='pascal_voc') -> float:
     """Calculates the Intersection over Union.
@@ -186,8 +187,10 @@ def plot_result(sample, preds, gt_boxes):
     plt.show()
 
 
-# helper function to calculate IoU
 def iou(box1, box2):
+    """
+    Helper function to calculate IoU
+    """
     x11, y11, w1, h1 = box1
     x21, y21, w2, h2 = box2
     assert w1 * h1 > 0
@@ -286,7 +289,7 @@ def competition_metric(true_boxes, true_boxes, pred_scores, score_thr):
 
     true_boxes = [convert_to_xyhw_boxes(x) for x in true_boxes]
     pred_boxes = [convert_to_xyhw_boxes(x) for x in pred_boxes]
-    #assert len(true_boxes) == len(pred_boxes)
+    
     n_images = len(true_boxes)
 
     ns = 0
