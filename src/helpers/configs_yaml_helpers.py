@@ -12,7 +12,7 @@ def join(loader, node):
 yaml.add_constructor('!join', join)
 
 
-def _update_dict(d: dict, params: dict):
+def update_dict(d: dict, params: dict):
     print("Overwriting config parameters:")
     for k, v in params.items():
         *path, key = k.split(".")
@@ -33,8 +33,8 @@ def save_config(config: dict, directory: str, name='config.yml'):
         yaml.dump(config, f)
 
 
-def read_config(cfg_path: str, **kwargs) -> dict:
-    # read config to a dictionary
+def read_yaml_config(cfg_path: str) -> dict:
+    """Read yaml config to a dictionary"""
     with open(cfg_path) as cfg:
         cfg_yaml = yaml.load(cfg, Loader=yaml.FullLoader)
 

@@ -35,12 +35,10 @@ def calculate_iou(gt, pr, form='pascal_voc') -> float:
     # Calculate overlap area
     dx = min(gt[2], pr[2]) - max(gt[0], pr[0]) + 1    
     if dx < 0:
-        return 0.0
-    
+        return 0.0    
     dy = min(gt[3], pr[3]) - max(gt[1], pr[1]) + 1
     if dy < 0:
         return 0.0
-
     overlap_area = dx * dy
 
     # Calculate union area
@@ -92,6 +90,7 @@ def find_best_match(gts, pred, pred_idx, threshold: float = 0.5, form: str = 'pa
 
     return best_match_idx
 
+
 @jit(nopython=True)
 def calculate_precision(gts, preds, threshold = 0.5, form = 'coco', ious=None) -> float:
     """Calculates precision for GT - prediction pairs at one threshold.
@@ -116,13 +115,11 @@ def calculate_precision(gts, preds, threshold = 0.5, form = 'coco', ious=None) -
 
         best_match_gt_idx = find_best_match(gts, preds[pred_idx], pred_idx,
                                             threshold=threshold, form=form, ious=ious)
-
         if best_match_gt_idx >= 0:
             # True positive: The predicted box matches a gt box with an IoU above the threshold.
             tp += 1
             # Remove the matched GT box
             gts[best_match_gt_idx] = -1
-
         else:
             # No match
             # False positive: indicates a predicted box had no associated gt box.
@@ -160,6 +157,25 @@ def calculate_image_precision(gts, preds, thresholds = (0.5, ), form = 'coco') -
         image_precision += precision_at_threshold / n_threshold
 
     return image_precision
+
+
+@jit(nopython=True)
+def calculate_final_score(all_predictions, score_threshold: float, iou_thresholds: list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75]) -> float:
+    final_scores = []
+    for i in range(len(all_predictions)):
+        gt_boxes = all_predictions[i]['gt_boxes'].copy()
+        pred_boxes = all_predictions[i]['pred_boxes'].copy()
+        scores = all_predictions[i]['scores'].copy()
+        image_id = all_predictions[i]['image_id']
+
+        indexes = np.where(scores>score_threshold)
+        pred_boxes = pred_boxes[indexes]
+        scores = scores[indexes]
+
+        image_precision = calculate_image_precision(gt_boxes, pred_boxes, thresholds=iou_thresholds, form='pascal_voc')
+        final_scores.append(image_precision)
+
+    return np.mean(final_scores)
 
 
 def plot_result(sample, preds, gt_boxes):
@@ -253,7 +269,6 @@ def map_iou(boxes_true, boxes_pred, scores, thresholds=[0.5, 0.55, 0.6, 0.65, 0.
                     matched_bt.add(j)
             if not matched:
                 fn += 1  # bt has no match, count as FN
-
         fp = len(boxes_pred) - len(matched_bt)  # FP is the bp that not matched to any bt
         m = tp / (tp + fn + fp)
         map_total += m
@@ -272,7 +287,7 @@ def convert_to_xyhw_boxes(boxes: list) -> list:
     return [convert_to_xyhw_box(box.astype(np.int32)) for box in boxes]
 
 
-def competition_map(true_boxes, true_boxes, pred_scores, score_thr):
+def competition_map(true_boxes: np.array, true_boxes: np.array, pred_scores:np.array, score_thr) -> float:
     """
     Mean average precision at differnet intersection over union (IoU) threshold
 
@@ -282,7 +297,7 @@ def competition_map(true_boxes, true_boxes, pred_scores, score_thr):
         true_boxes : Nx4 numpy array of predicted bounding boxes of one image.
                     bbox format: (x1, y1, w, h)
         pred_scores:length N numpy array of scores associated with predicted bboxes
-        score_thr  : IoU shresholds to evaluate mean average precision on
+        score_thr  : IoU shreshold to evaluate mean average precision on
     Output:
         map: mean average precision of the image
     """
@@ -319,4 +334,21 @@ def competition_map(true_boxes, true_boxes, pred_scores, score_thr):
     print("True positive cases: ", ntps)
     print("Overall evaluation score: ", overall_maps)
 
-    return overall_maps
+    return overall_maps   
+
+
+def find_best_nms_threshold(true_list, pred_boxes, pred_scores, 
+                            min_thres: float = 0.30, max_thres:float = 0.40, point: int =10) -> Tuple[float, float]:
+
+    nms_thresholds = np.linspace(min_thres, max_thres, num=points, endpoint=False)     
+    best_metric = 0
+
+    for thr in nms_thresholds:
+        print('thr', thr)
+        cur_metric = competition_metric(true_list, pred_boxes, pred_scores, thr)
+        if cur_metric > best_metric:
+            best_thr = thr
+            best_metric = cur_metric
+    print(f'best_metric: {best_metric}, best thr: {best_thr}')
+
+    return (best_metric, best_thr)    

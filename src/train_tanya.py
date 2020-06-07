@@ -20,14 +20,19 @@ from torchvision import transforms
 from tqdm import tqdm
 sys.path.append("../timm-efficientdet-pytorch")
 import neptune
+from constants import DATA_DIR, META_TRAIN, TRAIN_DIR
+from datasets.dataset_sergey import WheatDataset
+from datasets.get_transforms import (get_train_transforms, get_transforms,
+                                     get_valid_transforms, set_augmentations)
 from effdet import DetBenchTrain, EfficientDet, get_efficientdet_config
 from effdet.efficientdet import HeadNet
-from datasets.dataset_sergey import WheatDataset
-from datasets.get_transforms import set_augmentations, get_transforms, get_train_transforms, get_valid_transforms
-from helpers.metric import competition_map
-from helpers.boxes_helpers import get_box, preprocess_boxes, filter_box_size, filter_box_area
-from helpers.model_helpers import collate_fn, load_weigths, get_effdet_pretrain_names
-from constants import DATA_DIR, TRAIN_DIR, META_TRAIN
+from helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
+                                   preprocess_boxes)
+from helpers.metric import competition_map, find_best_nms_threshold
+from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
+                                   load_weigths)
+
+
 
 warnings.filterwarnings('ignore')
 
@@ -88,6 +93,7 @@ class ModelRunner():
         self.model = model
         self.device = device
 
+
     def train_epoch(self, optimizer, generator):
         self.model.train()
         tqdm_generator = tqdm(generator, mininterval=30)
@@ -95,13 +101,12 @@ class ModelRunner():
 
         for batch_idx, (imgs, labels, image_ids) in enumerate(tqdm_generator):            
             loss = self.train_on_batch(optimizer, imgs, labels, batch_idx)
-
-            # just slide average
             current_loss_mean = (current_loss_mean * batch_idx + loss) / (batch_idx + 1)
 
             tqdm_generator.set_description('loss: {:.4} lr:{:.6}'.format(
                 current_loss_mean, get_lr(optimizer)))
         return current_loss_mean
+
 
     def train_on_batch(self, optimizer, batch_imgs, batch_labels, batch_idx):
         batch_imgs = torch.stack(batch_imgs)
@@ -115,6 +120,7 @@ class ModelRunner():
         optimizer.step()
         optimizer.zero_grad()
         return loss.item()
+
 
     def predict(self, generator):
         self.model.to(self.device)
@@ -136,7 +142,9 @@ class ModelRunner():
             tqdm_generator.set_description('predict')
         print(pred_scores)
         #print(pred_boxes)
+
         return true_list, pred_boxes, pred_scores
+
 
     def run_train(self, train_generator, val_generator, n_epoches, weights_file, factor, start_lr, min_lr,
                   lr_patience, overall_patience, loss_delta=0.):
@@ -161,10 +169,11 @@ class ModelRunner():
       
 
     def on_epoch_end(self, epoch, optimizer, val_generator, weights_file, factor, min_lr, lr_patience, overall_patience, loss_delta):
-        #true_boxes, pred_boxes, pred_scores = self.predict(val_generator)
-        #current_loss = competition_loss(true_boxes,  pred_boxes, pred_scores)
+        
         tqdm_generator = tqdm(val_generator, mininterval=30)
         current_loss = 0
+        true_list, pred_boxes, pred_scores = [], [], []
+
         self.model.eval()
         with torch.no_grad():
             for batch_idx, (batch_imgs, batch_labels, image_id) in enumerate(tqdm_generator):
@@ -172,31 +181,33 @@ class ModelRunner():
                 batch_imgs = batch_imgs.to(self.device).float()
                 batch_boxes = [target['boxes'].to(self.device) for target in batch_labels]
                 batch_labels = [target['labels'].to(self.device) for target in batch_labels]
+                
                 loss, _, _ = self.model(batch_imgs, batch_boxes, batch_labels)
-
-                loss_value = loss.item()
-                # just slide average
-                current_loss = (current_loss * batch_idx + loss_value) / (batch_idx + 1)
-                # metric
-
+                loss_value = loss.item()                
+                current_loss = (current_loss * batch_idx + loss_value) / (batch_idx + 1)     
+        
+        # validate loss
         print('validation loss: ', current_loss)
         neptune.log_metric('Validation loss', current_loss)
-        """
+        # validate metric
+        nms_thr = 0.37
         true_list, pred_boxes, pred_scores = self.predict(val_generator)
-        cur_metric = competition_metric(true_list, pred_boxes, pred_scores, 0.4)
-        print('competition_metric', cur_metric)
-        """
-
+        cur_metric = competition_metric(true_list, pred_boxes, pred_scores, nms_thr)
+        print('Validation mAP', cur_metric)
+        neptune.log_metric('Validation mAP', cur_metric)
+        neptune.log_text('nms_threshold', str(nms_thr))
+        
         if current_loss < self.best_loss - loss_delta:
-            print('Loss has been improved from', self.best_loss, 'to', current_loss)
+            print(f'\nLoss has been improved from {self.best_loss} to {current_loss}')
             self.best_loss = current_loss
             self.best_epoch = epoch
             torch.save(self.model.model.state_dict(), weights_file)
         else:
-            print('Loss has not been improved from', self.best_loss)
-            if epoch - self.best_epoch > overall_patience:
-                print('Training finished with patience!')
-                return False
+            print(f'\nLoss has not been improved from {self.best_loss}')  
+            
+        if epoch - self.best_epoch > overall_patience:
+            print('\nEarly stop: training finished with patience!')
+            return False 
 
         print('curr_lr_loss', self.curr_lr_loss)
         if current_loss >= self.curr_lr_loss - loss_delta:
@@ -297,7 +308,7 @@ def main() -> None:
     weights_file = f'{experiment_name}.pth'
     # add tags 
     neptune.append_tags(f'{experiment_name}') 
-    neptune.append_text('save checkpoints as', weights_file[:-4])
+    neptune.log_text('save checkpoints as', weights_file[:-4])
 
     # run training 
     runner.run_train(train_data_loader, valid_data_loader, n_epoches=n_epochs, weights_file=weights_file,
@@ -307,4 +318,3 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
-    
