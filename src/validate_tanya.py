@@ -38,10 +38,17 @@ from helpers.image_helpers import load_image
 from helpers.boxes_helpers import format_prediction_string
 from model_runner import ModelRunner
 
+
+model_name = 'effdet4'
+experiment_name = f'{model_name}_fold{fold}_{image_size}'
+experiment_tag = 'run1'
+
+fold = 3
 num_workers = 2
-batch_size = 2
+batch_size = 4
 inf_batch_size = 16
 image_size = 512
+gpu_number=1
 
 
 def main() -> None:
