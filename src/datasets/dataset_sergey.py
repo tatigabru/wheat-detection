@@ -1,15 +1,12 @@
-import pandas as pd
-import numpy as np
-import cv2
 import os
-from sklearn.utils import shuffle
 import random
-from PIL import Image
 
 import albumentations as A
-from albumentations.pytorch.transforms import ToTensorV2, ToTensor
-
+import cv2
+import numpy as np
+import pandas as pd
 import torch
+from albumentations.pytorch.transforms import ToTensor, ToTensorV2
 from torch.utils.data import Dataset
 
 

@@ -1,42 +1,42 @@
-import warnings
-warnings.filterwarnings('ignore')
-
-import pandas as pd
-import numpy as np
-import cv2
 import os
-import re
-
-from PIL import Image
+import random
+import sys
+import warnings
+sys.path.append("../../timm-efficientdet-pytorch")
 
 import albumentations as A
-from albumentations.pytorch.transforms import ToTensorV2, ToTensor
-
+#import cv2
+import numpy as np
+import pandas as pd
 import torch
-import torchvision
 import torch.optim as optim
-from torchvision import transforms
-
-import sys
-sys.path.append("../timm-efficientdet-pytorch")
-
-from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain, DetBenchEval
-from effdet.efficientdet import HeadNet
-
+import torchvision
+from albumentations.pytorch.transforms import ToTensor, ToTensorV2
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.sampler import SequentialSampler
+#from torchvision import transforms
 from tqdm import tqdm
-from constants import META_TRAIN, TRAIN_DIR, TEST_DIR
-from helpers.boxes_helpers import preprocess_boxes, filter_box_area, filter_box_size
-import random
+
+from constants import META_TRAIN, TEST_DIR, TRAIN_DIR
 from datasets.dataset_sergey import WheatDataset
-from datasets.get_transforms import set_augmentations, get_transforms, get_train_transforms, get_valid_transforms
-from matplotlib import pyplot as plt
-from helpers.metric import competition_map, iou, map_iou
-from helpers.model_helpers import collate_fn, load_weigths, get_effdet_pretrain_names
+from datasets.get_transforms import (get_train_transforms, get_transforms,
+                                     get_valid_transforms, set_augmentations)
+from effdet import (DetBenchEval, DetBenchTrain, EfficientDet,
+                    get_efficientdet_config)
+from effdet.efficientdet import HeadNet
+from helpers.boxes_helpers import (filter_box_area, filter_box_size,
+                                   format_prediction_string, preprocess_boxes)
 from helpers.image_helpers import load_image
-from helpers.boxes_helpers import format_prediction_string
+#from matplotlib import pyplot as plt
+from helpers.metric import competition_map, iou, map_iou
+from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
+                                   load_weigths)
 from model_runner import ModelRunner
+
+warnings.filterwarnings('ignore')
+
+#import re
+#from PIL import Image
 
 
 model_name = 'effdet4'

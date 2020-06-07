@@ -1,6 +1,6 @@
 import os
 import random
-import re
+#import re
 import sys
 import warnings
 
@@ -11,14 +11,15 @@ import pandas as pd
 import torch
 import torch.optim as optim
 import torchvision
-from albumentations.pytorch.transforms import ToTensor, ToTensorV2
-from matplotlib import pyplot as plt
-from PIL import Image
+#from albumentations.pytorch.transforms import ToTensor, ToTensorV2
+#from matplotlib import pyplot as plt
+#from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.sampler import SequentialSampler
-from torchvision import transforms
+#from torchvision import transforms
 from tqdm import tqdm
-sys.path.append("../timm-efficientdet-pytorch")
+sys.path.append("../../timm-efficientdet-pytorch")
+
 import neptune
 from constants import DATA_DIR, META_TRAIN, TRAIN_DIR
 from datasets.dataset_sergey import WheatDataset
@@ -31,8 +32,7 @@ from helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
 from helpers.metric import competition_map, find_best_nms_threshold
 from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
                                    load_weigths)
-
-
+from model_runner import ModelRunner
 
 warnings.filterwarnings('ignore')
 
