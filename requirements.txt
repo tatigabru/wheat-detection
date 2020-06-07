@@ -18,3 +18,4 @@ tqdm>=4.25.0
 neptune-client == 0.4.114
 numba
 psutil>=5.7.0
+ensemble-boxes
