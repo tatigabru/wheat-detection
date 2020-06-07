@@ -24,53 +24,38 @@ from effdet import DetBenchTrain, EfficientDet, get_efficientdet_config
 from effdet.efficientdet import HeadNet
 
 warnings.filterwarnings('ignore')
-
+#ys.path.append("../timm-efficientdet-pytorch")
 
 print(torch.__version__)
 print(neptune.__version__)
 
-neptune.init('ods/wheat')
+neptune.init('blonde/wheat')
 
 DATA_DIR = '../../data'
 DIR_TRAIN = f'{DATA_DIR}/train'
 DIR_TEST = f'{DATA_DIR}/test'
 fold_column = 'fold'
-fold = 2
+fold = 1
 image_id_column = 'image_id'
 num_workers = 2
 train_batch_size = 4
 inf_batch_size = 16
 our_image_size = 512
-n_epochs=60 
-factor=0.2
-start_lr=1e-3
-min_lr=1e-6 
-lr_patience=2
-overall_patience=10 
-loss_delta=1e-4
-experiment_name = 'effdet4'
 
 # Define parameters
-PARAMS = {'fold' : fold,
-          'num_workers': num_workers,
-          'train_batch_size': train_batch_size,
-          'our_image_size': our_image_size,
-          'n_epochs': n_epochs, 
-          'factor': factor, 
-          'start_lr': start_lr, 
-          'min_lr': min_lr, 
-          'lr_patience': lr_patience, 
-          'overall_patience': overall_patience, 
-          'loss_delta': loss_delta,          
+PARAMS = {'fold' : 1,
+          'num_workers': 2,
+          'train_batch_size': 4,
+          'our_image_size': 512
          }
 
 # Create experiment with defined parameters
-neptune.create_experiment (name=experiment_name,
+neptune.create_experiment (name='experiment_name',
                           params=PARAMS, 
                           tags=['version_v4'],
-                          upload_source_files=['train_effdet_sergey_tanya.py'])    
-
-neptune.append_tags('fold_2')
+                          upload_source_files=['train_effdet_sergey_tanya.py'])
+# add tags 
+neptune.append_tags('effdet4')    
 
 train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'train.csv'))
 
@@ -399,7 +384,7 @@ def competition_metric(true_boxes, pred_boxes, pred_scores, score_thr):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
-def get_lr(optimizer ):
+def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
 
@@ -489,7 +474,6 @@ class ModelManager():
             
             if not self.on_epoch_end(epoch, optimizer, val_generator, weights_file, factor, min_lr, lr_patience, overall_patience, loss_delta):
                 break
-      
 
     def on_epoch_end(self, epoch, optimizer, val_generator, weights_file, factor, min_lr, lr_patience, overall_patience, loss_delta):
         #true_boxes, pred_boxes, pred_scores = self.predict(val_generator)
@@ -555,7 +539,7 @@ def do_main():
     print(len(train_images_df))
 
     # Leave only > 0
-    print('Leave only train images with boxes (all)')
+    print('leavy only train images with boxes (all)')
     with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
 
     fold_ = fold
@@ -595,7 +579,7 @@ def do_main():
     config.image_size = our_image_size
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
-    fold_weights_file = f'{experiment_name}_fold{fold}.pth'
+    fold_weights_file = 'effdet4.pth'
     if os.path.exists(fold_weights_file):
         # continue training
         print('Continue training, loading weights: ' + fold_weights_file)
@@ -604,15 +588,14 @@ def do_main():
     model = DetBenchTrain(net, config)
 
     manager = ModelManager(model, device)
-    weights_file = f'{experiment_name}_fold{fold}.pth'
+    weights_file = 'effdet4.pth'
     # add tags 
-    neptune.append_tags(f'{experiment_name}_fold{fold}') 
+    neptune.append_tags('effdet4') 
 
-    manager.run_train(train_data_loader, valid_data_loader, n_epoches=n_epochs, weights_file=weights_file,
-                      factor=factor, start_lr=start_lr, min_lr=min_lr, lr_patience=lr_patience, overall_patience=overall_patience, loss_delta=loss_delta)
-    neptune.stop()
-
-
+    manager.run_train(train_data_loader, valid_data_loader, n_epoches=40, weights_file=weights_file,
+                      factor=0.5, start_lr=2e-4, min_lr=1e-6, lr_patience=1, overall_patience=10, loss_delta=1e-4)
+    # Log text data
+    neptune.log_text('n_epoches=40, factor=0.5, start_lr=2e-4, min_lr=1e-6, lr_patience=1, overall_patience=10, loss_delta=1e-4')
+    
 if __name__ == '__main__':
     do_main()
-    
