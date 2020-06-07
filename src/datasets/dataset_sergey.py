@@ -14,12 +14,20 @@ from torch.utils.data import Dataset
 
 
 class WheatDataset(Dataset):
-    def __init__(self, image_ids, image_dir, box_callback, transforms, is_test):
+    def __init__(self, 
+                image_ids: list, 
+                image_dir: str, 
+                #box_callback,
+                labels_df: pd.DataFrame, 
+                transforms, 
+                is_test: bool
+                ):
         super().__init__()
 
         self.image_ids = image_ids
         self.image_dir = image_dir
-        self.box_callback = box_callback
+        self.labels_df = labels_df
+        #self.box_callback = box_callback
         self.transforms = transforms
         self.is_test = is_test
 
@@ -80,9 +88,9 @@ class WheatDataset(Dataset):
 
     def load_image_and_boxes(self, index):
         image_id = self.image_ids[index]
-        #records = boxes_df[boxes_df['image_id'] == image_id]
-        #boxes = records[['x', 'y', 'w', 'h']].values
-        boxes = self.box_callback(image_id)
+        records = self.labels_df[self.labels_df['image_id'] == image_id]
+        boxes = records[['x', 'y', 'w', 'h']].values
+        #boxes = self.box_callback(image_id)
 
         image = cv2.imread(f'{self.image_dir}/{image_id}.jpg', cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
