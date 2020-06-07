@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 
 from numba import jit
 from typing import List, Union, Tuple, Optional
-from ..constants import TRAIN_DIR
 
 
 @jit(nopython=True)
@@ -272,7 +271,7 @@ def convert_to_xyhw_boxes(boxes):
     return [convert_to_xyhw_box(box.astype(np.int32)) for box in boxes]
 
 
-def competition_metric(true_boxes, true_boxes, pred_scores, score_thr):
+def competition_map(true_boxes, true_boxes, pred_scores, score_thr):
     """
     Mean average precision at differnet intersection over union (IoU) threshold
 
@@ -286,7 +285,6 @@ def competition_metric(true_boxes, true_boxes, pred_scores, score_thr):
     Output:
         map: mean average precision of the image
     """
-
     true_boxes = [convert_to_xyhw_boxes(x) for x in true_boxes]
     pred_boxes = [convert_to_xyhw_boxes(x) for x in pred_boxes]
     
@@ -321,18 +319,3 @@ def competition_metric(true_boxes, true_boxes, pred_scores, score_thr):
     print("Overall evaluation score: ", overall_maps)
 
     return overall_maps
-
-
-if __name__=="__main__":
-
-    TRAIN_DIR = '../../data/train'
-    samples = os.listdir(TRAIN_DIR)
-    sample_id = samples[0][:-4]
-    sample = cv2.imread(f'{TRAIN_DIR}/{sample_id}.jpg', cv2.IMREAD_COLOR)
-    sample = cv2.cvtColor(sample, cv2.COLOR_BGR2RGB)
-
-    # Numba typed list!
-    iou_thresholds = numba.typed.List()
-
-    for x in [0.5, 0.55, 0.6, 0.65, 0.7, 0.75]:
-        iou_thresholds.append(x)

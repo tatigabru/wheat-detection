@@ -47,14 +47,13 @@ tensor_norm = [
 normalise = A.Normalize()
 
 
-resize_norm = [
-                    A.SmallestMaxSize(IMG_SIZE, interpolation=0, p=1.),
+resize_norm = [     A.SmallestMaxSize(IMG_SIZE, interpolation=0, p=1.),
                     A.RandomCrop(IMG_SIZE, IMG_SIZE, p=1.), 
                     A.Normalize(),
-                    ])
+                    ]
         
 
-geometric_transforms = A.Compose([                    
+geometric_transforms = [                    
                     A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=15, 
                        interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, value=0, mask_value=0, p=0.5),
                     A.RandomSizedCrop((int(0.5*IMG_SIZE), IMG_SIZE), IMG_SIZE, IMG_SIZE),
@@ -63,18 +62,17 @@ geometric_transforms = A.Compose([
                     A.VerticalFlip(p=0.5),
                     A.RandomRotate90(p=0.5),
                     A.Transpose(p=0.2),                    
-                    ])
+                    ]
 
 
-hflip_brightness = A.Compose([                    
+hflip_brightness = [                    
                     A.HorizontalFlip(p=0.5),
                     A.RandomBrightnessContrast(p=0.5),                    
-                    ])
+                    ]
                     
 
-train_medium = A.Compose([ 
-            A.ShiftScaleRotate(shift_limit=0., scale_limit=0.2, rotate_limit=5, p = 0.5),          
-                            
+train_medium = [ 
+            A.ShiftScaleRotate(shift_limit=0., scale_limit=0.2, rotate_limit=5, p = 0.5),                           
             A.OneOf(
                 [
                     A.RandomBrightnessContrast(p=0.7),
@@ -82,31 +80,29 @@ train_medium = A.Compose([
                     A.RandomGamma(p=0.4),                    
                 ],
                 p=0.7),
-
             # D4 Group augmentations
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
             A.Transpose(p=0.2),                  
-        ])
+        ]
 
 
-valid_ade = A.Compose([
+valid_ade = [
             A.SmallestMaxSize(IMG_SIZE, p=1.),
             A.Lambda(name="Pad32", image=pad_x32, mask=pad_x32),   
             A.Normalize(),         
-        ])
+        ]
 
 
 # from bloodaxe 
 # https://github.com/BloodAxe/Catalyst-Inria-Segmentation-Example/blob/master/inria/augmentations.py
-crop_transform = A.Compose([A.RandomSizedCrop((int(0.5*IMG_SIZE), IMG_SIZE), IMG_SIZE, IMG_SIZE),                
-            ])
+crop_transform = [A.RandomSizedCrop((int(0.5*IMG_SIZE), IMG_SIZE), IMG_SIZE, IMG_SIZE)]
 
 
-safe_augmentations = A.Compose([A.HorizontalFlip(), A.RandomBrightnessContrast()])
+safe_augmentations = [A.HorizontalFlip(), A.RandomBrightnessContrast()]
 
-light_augmentations = A.Compose([
+light_augmentations = [
                 A.HorizontalFlip(),
                 A.RandomBrightnessContrast(),
                 A.OneOf([
@@ -116,10 +112,10 @@ light_augmentations = A.Compose([
                     A.NoOp()
                 ]),
                 A.HueSaturationValue(),                
-            ])
+            ]
 
 
-medium_augmentations = A.Compose([
+medium_augmentations = [
                     A.HorizontalFlip(),
                     A.ShiftScaleRotate(scale_limit=0.3, rotate_limit=7, border_mode=cv2.BORDER_CONSTANT),
                     # Add occasion blur/sharpening
@@ -130,7 +126,7 @@ medium_augmentations = A.Compose([
                     A.OneOf([A.RandomBrightnessContrast(), A.CLAHE(), A.HueSaturationValue(), A.RGBShift(), A.RandomGamma()]),
                     # Weather effects
                     A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1),                   
-            ])
+            ]
 
 
 hard_augmentations = [                    
@@ -159,7 +155,8 @@ hard_augmentations = [
                     ),
                     # Weather effects                    
                     A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.1),                    
-            ]           
+            ]   
+
 
 hard_augs = [             
                     A.RandomSizedBBoxSafeCrop(height = IMG_SIZE, width = IMG_SIZE, erosion_rate=0.0, interpolation=1, always_apply=False, p=1.0),

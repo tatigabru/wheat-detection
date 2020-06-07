@@ -102,3 +102,23 @@ def load_model(model: nn.Module, checkpoint_path: str) -> tuple:
     
     return model, checkpoint    
 
+
+def collate_fn(batch):
+    return tuple(zip(*batch))
+
+
+def get_lr(optimizer ):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
+
+
+def set_lr(optimizer, new_lr):
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = new_lr
+
+
+def load_weights(model: nn.Module, weights_file: str):
+    model.load_state_dict(torch.load(weights_file))
+
+    return model
+

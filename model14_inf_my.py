@@ -26,67 +26,21 @@ from effdet.efficientdet import HeadNet
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.sampler import SequentialSampler
 from tqdm import tqdm
-
+from constants import META_TRAIN, TRAIN_DIR, TEST_DIR
+from helpers.boxes_helpers import preprocess_boxes, filter_box_area, filter_box_size
 import random
 
 from matplotlib import pyplot as plt
 
-DATA_DIR = '../Data'
-DIR_TRAIN = f'{DATA_DIR}/train'
-DIR_TEST = f'{DATA_DIR}/test'
-fold_column = 'fold'
-image_id_column = 'image_id'
 num_workers = 2
 train_batch_size = 2
 inf_batch_size = 16
 our_image_size = 512
 
-train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'train.csv'))
-
-train_boxes_df['x'] = -1
-train_boxes_df['y'] = -1
-train_boxes_df['w'] = -1
-train_boxes_df['h'] = -1
-
-def expand_bbox(x):
-    r = np.array(re.findall("([0-9]+[.]?[0-9]*)", x))
-    if len(r) == 0:
-        r = [-1, -1, -1, -1]
-    return r
-
-train_boxes_df[['x', 'y', 'w', 'h']] = np.stack(train_boxes_df['bbox'].apply(lambda x: expand_bbox(x)))
-train_boxes_df.drop(columns=['bbox'], inplace=True)
-train_boxes_df['x'] = train_boxes_df['x'].astype(np.float)
-train_boxes_df['y'] = train_boxes_df['y'].astype(np.float)
-train_boxes_df['w'] = train_boxes_df['w'].astype(np.float)
-train_boxes_df['h'] = train_boxes_df['h'].astype(np.float)
-
-train_boxes_df['area'] = train_boxes_df['w'] * train_boxes_df['h']
-area_filter = (train_boxes_df['area'] < 160000) & (train_boxes_df['area'] > 50)
-if False:
-    train_boxes_df = train_boxes_df[area_filter]
-else:
-    print('No filtering for boxes')
-
+train_boxes_df = pd.read_csv(META_TRAIN)
+train_boxes_df = preprocess_boxes(train_boxes_df)
 train_images_df = pd.read_csv('orig_alex_folds.csv')
 
-def train_box_callback(image_id):
-    records = train_boxes_df[train_boxes_df['image_id'] == image_id]
-    return records[['x', 'y', 'w', 'h']].values
-
-def split_prediction_string(str):
-    parts = str.split()
-    assert len(parts) % 5 == 0
-    locations = []
-    for ind in range(len(parts) // 5):
-        score = float(parts[ind * 5])
-        location = int(float(parts[ind * 5 + 1])), int(float(parts[ind * 5 + 2])), \
-                   int(float(parts[ind * 5 + 3])), int(float(parts[ind * 5 + 4]))
-        # print(score)
-        # print(location)
-        locations.append(np.array(location))
-    assert len(locations) > 0
-    return np.array(locations)
 
 class WheatDataset(Dataset):
     def __init__(self, image_ids, image_dir, box_callback, transforms, is_test):

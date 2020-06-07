@@ -26,9 +26,6 @@ from effdet.efficientdet import HeadNet
 warnings.filterwarnings('ignore')
 
 
-print(torch.__version__)
-print(neptune.__version__)
-
 neptune.init('ods/wheat')
 
 DATA_DIR = '../../data'

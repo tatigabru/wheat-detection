@@ -162,7 +162,6 @@ def load_image_boxes(image_id, labels: pd.DataFrame, format: str = 'pascal_voc')
         boxes[:, 3] = boxes[:, 1] + boxes[:, 3]
 
     return image, boxes
-    
 
 def normalize(img: np.array, mean: list=[0.485, 0.456, 0.406], std: list=[0.229, 0.224, 0.225], max_value: float=255) -> np.array:
     """
