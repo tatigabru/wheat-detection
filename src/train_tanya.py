@@ -26,9 +26,9 @@ from datasets.dataset_sergey import WheatDataset
 from datasets.get_transforms import set_augmentations, get_transforms, get_train_transforms, get_valid_transforms
 from helpers.metric import competition_map
 from helpers.boxes_helpers import get_box, preprocess_boxes, filter_box_size, filter_box_area
-from helpers.model_helpers import collate_fn
+from helpers.model_helpers import collate_fn, load_weigths, get_effdet_pretrain_names
 from constants import DATA_DIR, TRAIN_DIR, META_TRAIN
-import config as cfg
+
 warnings.filterwarnings('ignore')
 
 fold = 3
@@ -44,8 +44,10 @@ lr_patience=2
 overall_patience=10 
 loss_delta=1e-4
 gpu_number=1
-experiment_name = 'effdet4'
-experiment_tag = '_run1'
+
+model_name = 'effdet4'
+experiment_name = f'{model_name}_fold{fold}_{image_size}'
+experiment_tag = 'run1'
 
 # Define parameters
 PARAMS = {'fold' : fold,
@@ -61,7 +63,6 @@ PARAMS = {'fold' : fold,
           'overall_patience': overall_patience, 
           'loss_delta': loss_delta,          
          }
-
 print(f'parameters: {PARAMS}')
 
 # Create experiment with defined parameters
@@ -70,6 +71,16 @@ neptune.create_experiment (name=experiment_name,
                           params=PARAMS, 
                           tags=['version_v4'],
                           upload_source_files=['train_tanya.py'])    
+
+
+def get_lr(optimizer ):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
+
+
+def set_lr(optimizer, new_lr):
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = new_lr
 
 
 class ModelRunner():
@@ -207,7 +218,7 @@ class ModelRunner():
         return True
 
 
-def do_main() -> None:
+def main() -> None:
     device = f"cuda:{gpu_number}" if torch.cuda.is_available() else torch.device('cpu')
     print(device)
 
@@ -231,16 +242,18 @@ def do_main() -> None:
     
     # get datasets
     train_dataset = WheatDataset(
-                                images_train, 
-                                TRAIN_DIR, 
-                                train_box_callback,
-                                transforms=get_train_transforms(image_size), 
-                                is_test=False
+                                image_ids = images_train[:16], 
+                                image_dir = TRAIN_DIR, 
+                                #train_box_callback,
+                                labels_df = train_boxes_df,
+                                transforms = get_train_transforms(image_size), 
+                                is_test = False
                                 )
     valid_dataset = WheatDataset(
-                                images_val, 
-                                TRAIN_DIR, 
-                                train_box_callback,
+                                image_ids = images_val[:16], 
+                                image_dir = TRAIN_DIR, 
+                                labels_df = train_boxes_df,
+                                #train_box_callback,
                                 transforms=get_valid_transforms(image_size), 
                                 is_test=True
                                 )
@@ -251,7 +264,7 @@ def do_main() -> None:
         shuffle=True,
         num_workers=num_workers,
         collate_fn=collate_fn
-     )
+        )
 
     valid_data_loader = DataLoader(
         valid_dataset,
@@ -259,34 +272,39 @@ def do_main() -> None:
         shuffle=False,
         num_workers=num_workers,
         collate_fn=collate_fn
-    )
-
-    config = get_efficientdet_config('tf_efficientdet_d4')
-    net = EfficientDet(config, pretrained_backbone=False)
-    load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d4-5b370b7a.pth')
-
+        )
+        
+    # efficientdet config
+    config = get_efficientdet_config(f'tf_efficientdet_d{model_name[-1]}')
     config.num_classes = 1
-    config.image_size = our_image_size
+    config.image_size = image_size
+
+    net = EfficientDet(config, pretrained_backbone=False)     
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
-    fold_weights_file = f'{experiment_name}_fold{fold}.pth'
-    if os.path.exists(fold_weights_file):
-        # continue training
-        print('Continue training, loading weights: ' + fold_weights_file)
-        load_weights(net, fold_weights_file)
-
+    weights_file = f'{experiment_name}.pth'
+    # continue training
+    if os.path.exists(weights_file):        
+        print(f'Continue training, loading weights from: {weights_file}')
+        load_weights(net, weights_file)
+    else:
+        print(f'Use coco pretrain')
+        pretrain = get_effdet_pretrain_names(model_name)
+        load_weights(net, '../timm-efficientdet-pytorch/{pretrain}')
     model = DetBenchTrain(net, config)
 
-    manager = ModelManager(model, device)
-    weights_file = f'{experiment_name}_fold{fold}.pth'
+    runner = ModelRunner(model, device)
+    weights_file = f'{experiment_name}.pth'
     # add tags 
-    neptune.append_tags(f'{experiment_name}_fold{fold}') 
+    neptune.append_tags(f'{experiment_name}') 
+    neptune.append_text('save checkpoints as', weights_file[:-4])
 
-    manager.run_train(train_data_loader, valid_data_loader, n_epoches=n_epochs, weights_file=weights_file,
+    # run training 
+    runner.run_train(train_data_loader, valid_data_loader, n_epoches=n_epochs, weights_file=weights_file,
                       factor=factor, start_lr=start_lr, min_lr=min_lr, lr_patience=lr_patience, overall_patience=overall_patience, loss_delta=loss_delta)
     neptune.stop()
 
 
 if __name__ == '__main__':
-    do_main()
+    main()
     

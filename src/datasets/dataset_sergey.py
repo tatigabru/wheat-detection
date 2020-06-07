@@ -19,7 +19,7 @@ class WheatDataset(Dataset):
                 image_dir: str, 
                 #box_callback,
                 labels_df: pd.DataFrame, 
-                transforms, 
+                transforms: A.Compose, 
                 is_test: bool
                 ):
         super().__init__()

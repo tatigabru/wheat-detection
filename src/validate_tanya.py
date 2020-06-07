@@ -29,190 +29,23 @@ from tqdm import tqdm
 from constants import META_TRAIN, TRAIN_DIR, TEST_DIR
 from helpers.boxes_helpers import preprocess_boxes, filter_box_area, filter_box_size
 import random
-from datasets.dataset_sergey import Wh
-
+from datasets.dataset_sergey import WheatDataset
+from datasets.get_transforms import set_augmentations, get_transforms, get_train_transforms, get_valid_transforms
 from matplotlib import pyplot as plt
+from helpers.metric import competition_map, iou, map_iou
+from helpers.model_helpers import collate_fn, load_weigths, get_effdet_pretrain_names
+from helpers.image_helpers import load_image
+from helpers.boxes_helpers import format_prediction_string
 
 num_workers = 2
-train_batch_size = 2
+batch_size = 2
 inf_batch_size = 16
-our_image_size = 512
+image_size = 512
 
 train_boxes_df = pd.read_csv(META_TRAIN)
 train_boxes_df = preprocess_boxes(train_boxes_df)
 train_images_df = pd.read_csv('orig_alex_folds.csv')
 
-
-# Albumentations
-def get_train_transform():
-    return A.Compose([
-        A.RandomSizedCrop(min_max_height=(800, 800), height=1024, width=1024, p=0.5),
-        A.OneOf([
-            A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit=0.2,
-                                 val_shift_limit=0.2, p=0.9),
-            A.RandomBrightnessContrast(brightness_limit=0.2,
-                                       contrast_limit=0.2, p=0.9),
-        ], p=0.9),
-        #A.ToGray(p=0.01),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.Resize(height=our_image_size, width=our_image_size, p=1),
-        A.Cutout(num_holes=8, max_h_size=our_image_size // 8, max_w_size=our_image_size // 8, fill_value=0, p=0.5)
-    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
-
-
-def get_valid_transform():
-    return A.Compose([
-        A.Resize(height=our_image_size, width=our_image_size, p=1)
-    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
-
-# helper function to calculate IoU
-def iou(box1, box2):
-    x11, y11, w1, h1 = box1
-    x21, y21, w2, h2 = box2
-    assert w1 * h1 > 0
-    assert w2 * h2 > 0
-    x12, y12 = x11 + w1, y11 + h1
-    x22, y22 = x21 + w2, y21 + h2
-
-    area1, area2 = w1 * h1, w2 * h2
-    xi1, yi1, xi2, yi2 = max([x11, x21]), max([y11, y21]), min([x12, x22]), min([y12, y22])
-
-    if xi2 <= xi1 or yi2 <= yi1:
-        return 0
-    else:
-        intersect = (xi2 - xi1) * (yi2 - yi1)
-        union = area1 + area2 - intersect
-        return intersect / union
-
-
-def map_iou(boxes_true, boxes_pred, scores, thresholds=[0.5, 0.55, 0.6, 0.65, 0.7, 0.75]):
-    """
-    Mean average precision at differnet intersection over union (IoU) threshold
-
-    input:
-        boxes_true: Mx4 numpy array of ground true bounding boxes of one image.
-                    bbox format: (x1, y1, w, h)
-        boxes_pred: Nx4 numpy array of predicted bounding boxes of one image.
-                    bbox format: (x1, y1, w, h)
-        scores:     length N numpy array of scores associated with predicted bboxes
-        thresholds: IoU shresholds to evaluate mean average precision on
-    output:
-        map: mean average precision of the image
-    """
-
-    # According to the introduction, images with no ground truth bboxes will not be
-    # included in the map score unless there is a false positive detection (?)
-
-    # return None if both are empty, don't count the image in final evaluation (?)
-    if len(boxes_true) == 0 and len(boxes_pred) == 0:
-        return None
-
-    assert boxes_true.shape[1] == 4 or boxes_pred.shape[1] == 4, "boxes should be 2D arrays with shape[1]=4"
-    if len(boxes_pred):
-        assert len(scores) == len(boxes_pred), "boxes_pred and scores should be same length"
-        # sort boxes_pred by scores in decreasing order
-        boxes_pred = boxes_pred[np.argsort(scores)[::-1], :]
-
-    map_total = 0
-
-    # loop over thresholds
-    for t in thresholds:
-        matched_bt = set()
-        tp, fn = 0, 0
-        for i, bt in enumerate(boxes_true):
-            matched = False
-            for j, bp in enumerate(boxes_pred):
-                miou = iou(bt, bp)
-                if miou >= t and not matched and j not in matched_bt:
-                    matched = True
-                    tp += 1  # bt is matched for the first time, count as TP
-                    matched_bt.add(j)
-            if not matched:
-                fn += 1  # bt has no match, count as FN
-
-        fp = len(boxes_pred) - len(matched_bt)  # FP is the bp that not matched to any bt
-        m = tp / (tp + fn + fp)
-        map_total += m
-
-    return map_total / len(thresholds)
-
-def make_int(x):
-    return int(x)
-
-def convert_to_xyhw_box(box):
-    #print('convert_to_xyhw_box', repr(box), box.__class__)
-    x1, y1, x2, y2 = box
-    x1 = make_int(x1)
-    x2 = make_int(x2)
-    y1 = make_int(y1)
-    y2 = make_int(y2)
-    return [x1, y1, x2 - x1, y2 - y1]
-
-def convert_to_xyhw_boxes(boxes):
-    return [convert_to_xyhw_box(box) for box in boxes]
-
-def competition_metric(true_boxes, pred_boxes, pred_scores, score_thr):
-    """
-    print(len(true_boxes))
-    print(len(pred_boxes))
-    print(len(pred_scores))
-    print(true_boxes[0])
-    print(pred_boxes[0])
-    print(pred_scores[0])
-    """
-
-    true_boxes = [convert_to_xyhw_boxes(x) for x in true_boxes]
-    pred_boxes = np.array(pred_boxes, dtype=int)
-    assert len(true_boxes) == len(pred_boxes)
-    n_images = len(true_boxes)
-
-    final_scores = []
-    ns = 0
-    nfps = 0
-    ntps = 0
-    overall_maps = 0
-    for ind in range(n_images):
-        cur_image_true_boxes = np.array(true_boxes[ind])
-        cur_image_pred_boxes = np.array(pred_boxes[ind])
-        cur_pred_scores = pred_scores[ind]
-        score_filter = cur_pred_scores >= score_thr
-        cur_image_pred_boxes = cur_image_pred_boxes[score_filter]
-        cur_pred_scores = cur_pred_scores[score_filter]
-        if (cur_image_true_boxes.shape[0] == 0 and cur_image_pred_boxes.shape[0] > 0):  # false positive
-            ns = ns + 1  # increment denominator but add nothing to numerator
-            nfps = nfps + 1  # track number of false positive cases, for curiosity
-        elif (cur_image_true_boxes.shape[0] > 0):  # actual positive
-            ns = ns + 1  # increment denominator & add contribution to numerator
-            contrib = map_iou(cur_image_true_boxes, cur_image_pred_boxes, cur_pred_scores, iou_thresholds)
-            # print('contrib', contrib)
-            overall_maps = overall_maps + contrib
-            if (cur_image_pred_boxes.shape[0] > 0):  # true positive
-                ntps = ntps + 1  # track number of true positive cases, for curiosity
-
-        """
-        if len(cur_image_pred_boxes):
-            assert len(cur_pred_scores) == len(cur_image_pred_boxes), "boxes_pred and scores should be same length"
-            # sort boxes_pred by scores in decreasing order
-            cur_image_pred_boxes = cur_image_pred_boxes[np.argsort(cur_pred_scores)[::-1], :]
-        image_precision = calculate_image_precision(cur_image_true_boxes, cur_image_pred_boxes,
-                                                    thresholds=iou_thresholds, form='coco')
-        #print(contrib, 'vs', image_precision)
-        final_scores.append(image_precision)
-        """
-
-    overall_maps = overall_maps / (ns + 1e-7)
-    new_variant_score = np.mean(final_scores)
-    print("ns:  ", ns)
-    print("False positive cases:  ", nfps)
-    print("True positive cases: ", ntps)
-    print("Overall evaluation score: ", overall_maps)
-    print("New Peter score: ", new_variant_score)
-
-    return overall_maps
-
-def collate_fn(batch):
-    return tuple(zip(*batch))
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
@@ -222,11 +55,8 @@ def set_lr(optimizer, new_lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = new_lr
 
-def load_weights(model, weights_file):
-    print('loading weights from', weights_file)
-    model.load_state_dict(torch.load(weights_file, map_location='cuda:0'))
 
-class ModelManager():
+class ModelRunner():
     def __init__(self, model, device):
         self.model = model
         self.device = device
@@ -237,10 +67,6 @@ class ModelManager():
         current_loss_mean = 0
 
         for batch_idx, (imgs, labels, image_id) in enumerate(tqdm_generator):
-            #if batch_idx == 0:
-            #   print('first batch is', image_id)
-            #if batch_idx > 5:
-            #    break
             loss = self.train_on_batch(optimizer, imgs, labels, batch_idx)
 
             # just slide average
@@ -352,17 +178,6 @@ class ModelManager():
             self.best_lr_epoch = epoch
         return True
 
-def load_image(file_name):
-    image = cv2.imread(file_name, cv2.IMREAD_COLOR)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    return image
-
-def format_prediction_string(boxes, scores):
-    pred_strings = []
-    for j in zip(scores, boxes):
-        pred_strings.append("{0:.4f} {1} {2} {3} {4}".format(j[0], j[1][0], j[1][1], j[1][2], j[1][3]))
-
-    return " ".join(pred_strings)
 
 
 def calculate_iou(gt, pr, form='pascal_voc') -> float:

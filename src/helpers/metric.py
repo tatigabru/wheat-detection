@@ -261,13 +261,14 @@ def map_iou(boxes_true, boxes_pred, scores, thresholds=[0.5, 0.55, 0.6, 0.65, 0.
     return map_total / len(thresholds)
 
 
-def convert_to_xyhw_box(box):
+def convert_to_xyhw_box(box: list) -> list:
     #print('convert_to_xyhw_box', repr(box), box.__class__)
     x1, y1, x2, y2 = box
+    x1, x2, y1, y2 = int(x1), int(x2), int(y1), int(y2)
     return [x1, y1, x2 - x1, y2 - y1]
 
 
-def convert_to_xyhw_boxes(boxes):
+def convert_to_xyhw_boxes(boxes: list) -> list:
     return [convert_to_xyhw_box(box.astype(np.int32)) for box in boxes]
 
 

@@ -1,12 +1,19 @@
-import os
-import torch
-import random
-import numpy as np
-from torch import nn
 import json
-from datetime import datetime
 import logging
+import os
+import random
+from datetime import datetime
 from typing import Tuple
+import sys 
+sys.path.append("../timm-efficientdet-pytorch")
+
+import numpy as np
+import torch
+from torch import nn
+
+from effdet import (DetBenchEval, DetBenchTrain, EfficientDet,
+                    get_efficientdet_config)
+from effdet.efficientdet import HeadNet
 
 
 def set_seed(seed: int=1234) -> None:
@@ -107,18 +114,45 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def get_lr(optimizer ):
-    for param_group in optimizer.param_groups:
-        return param_group['lr']
-
-
-def set_lr(optimizer, new_lr):
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = new_lr
-
-
 def load_weights(model: nn.Module, weights_file: str):
     model.load_state_dict(torch.load(weights_file))
-
     return model
 
+
+def set_train_effdet(config, num_classes: int = 1, device: torch.device = 'cuda:0'):
+    
+    model = EfficientDet(config, pretrained_backbone=False)    
+    model.class_net = HeadNet(config, num_outputs=num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
+    model = DetBenchTrain(net, config)
+    model = model.train()
+
+    return model.to_device(device)     
+   
+
+def set_eval_effdet(checkpoint_path: str, config, num_classes: int = 1, device: torch.device = 'cuda:0'):
+    
+    net = EfficientDet(config, pretrained_backbone=False)
+    net.class_net = HeadNet(config, num_outputs=num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
+
+    checkpoint = torch.load(checkpoint_path)
+    net.load_state_dict(checkpoint)
+
+    net = DetBenchEval(net, config)
+    net = net.eval()
+
+    return net.to_device(device)  
+
+
+def get_effdet_pretrain_names(alias: str = 'effdet4') -> str:
+    """Returns pretrains names for differne efficient dets"""
+    pretrains = { 
+        'effdet0': 'efficientdet_d0-d92fd44f.pth',
+        'effdet1': 'efficientdet_d1-4c7ebaf2.pth',
+        'effdet2': 'efficientdet_d2-cb4ce77d.pth',
+        'effdet3': 'efficientdet_d3-b0ea2cbc.pth',
+        'effdet4': 'efficientdet_d4-5b370b7a.pth',
+        'effdet5': 'efficientdet_d5-ef44aea8.pth',
+        'effdet6': 'efficientdet_d6-51cb0132.pth',
+        'effdet7': 'efficientdet_d7-f05bf714.pth',
+    }
+    return pretrains[alias] 

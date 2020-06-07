@@ -27,10 +27,24 @@ def pad_x32(image: np.array, **kwargs) -> np.array:
 
     return image
 
+
+def load_image(file_name: str) -> np.array:
+    """
+    Helper loads image from file
+        Args:
+            file_name: (str) name of the image file
+
+        Output: image as a numpy array    
+    """  
+    image = cv2.imread(file_name, cv2.IMREAD_COLOR)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    return image
+
    
 def normalize_4_channels(img: np.array, mean: list=[0.485, 0.456, 0.406, 0.406], std: list=[0.229, 0.224, 0.225, 0.225], max_value: float=92.88) -> np.array:
     """
-    Noramalize image data in 4 channels to 0-1 range,
+    Normalize image data in 4 channels to 0-1 range,
     then applymenaand std as in ImageNet pretrain, or any other
     """    
     mean = np.array(mean, dtype=np.float32)

@@ -73,7 +73,7 @@ def filter_box_area(train_boxes_df: pd.DataFrame, min_area: Optional[int] = 10, 
     return train_boxes_df       
 
 
-def get_box(boxes_df: pd.DataFrame, image_id: str) -> np.array:
+def get_boxes(boxes_df: pd.DataFrame, image_id: str) -> np.array:
     records = boxes_df[boxes_df['image_id'] == image_id]
     return records[['x', 'y', 'w', 'h']].values
 
@@ -93,3 +93,14 @@ def split_prediction_string(preds: str) -> np.array:
     if len(locations) <= 0: raise ValueError("No locations")
 
     return np.array(locations) 
+
+
+def format_prediction_string(boxes: list, scores: list) -> str:
+    """ 
+    Creates a string of bboxes preditions: confidence scores and coordinates 
+    """
+    pred_strings = []
+    for j in zip(scores, boxes):
+        pred_strings.append("{0:.4f} {1} {2} {3} {4}".format(j[0], j[1][0], j[1][1], j[1][2], j[1][3]))
+
+    return " ".join(pred_strings)
