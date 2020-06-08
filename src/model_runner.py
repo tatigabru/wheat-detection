@@ -3,10 +3,13 @@ import pandas as pd
 import torch
 import torch.optim as optim
 import torchvision
+from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from torch import nn
+
 import neptune
+
+from ..helpers.metric import competition_metric
 
 
 def get_lr(optimizer):

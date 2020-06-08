@@ -27,7 +27,7 @@ from effdet import DetBenchTrain, EfficientDet, get_efficientdet_config
 from effdet.efficientdet import HeadNet
 from helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
                                    preprocess_boxes)
-from helpers.metric import competition_map, find_best_nms_threshold
+from helpers.metric import competition_metric, find_best_nms_threshold
 from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
                                    load_weights)
 from model_runner import ModelRunner
@@ -50,7 +50,7 @@ gpu_number=1
 
 model_name = 'effdet4'
 experiment_name = f'{model_name}_fold{fold}_{image_size}'
-experiment_tag = 'run1'
+experiment_tag = 'v1'
 
 # Define parameters
 PARAMS = {'fold' : fold,
@@ -72,7 +72,7 @@ print(f'parameters: {PARAMS}')
 neptune.init('ods/wheat')
 neptune.create_experiment (name=experiment_name,
                           params=PARAMS, 
-                          tags=['version_v4'],
+                          tags=[experiment_name, experiment_tag],
                           upload_source_files=['train_tanya.py'])   
 
 
@@ -153,7 +153,6 @@ def main() -> None:
     runner = ModelRunner(model, device)
     weights_file = f'{experiment_name}.pth'
     # add tags 
-    neptune.append_tags(f'{experiment_name}') 
     neptune.log_text('save checkpoints as', weights_file[:-4])
 
     # run training 

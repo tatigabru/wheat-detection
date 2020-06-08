@@ -287,7 +287,7 @@ def convert_to_xyhw_boxes(boxes: list) -> list:
     return [convert_to_xyhw_box(box.astype(np.int32)) for box in boxes]
 
 
-def competition_map(true_boxes: np.array, pred_boxes: np.array, pred_scores:np.array, score_thr) -> float:
+def competition_metric(true_boxes: np.array, pred_boxes: np.array, pred_scores:np.array, score_thr) -> float:
     """
     Mean average precision at differnet intersection over union (IoU) threshold
 
