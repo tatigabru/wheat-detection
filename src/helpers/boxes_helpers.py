@@ -5,6 +5,7 @@ Helpers for bboxes preprocessing
 import pandas as pd
 import re
 import numpy as np
+from typing import List, Union, Tuple, Optional
 
 
 def expand_bbox(x: np.array) -> np.array:

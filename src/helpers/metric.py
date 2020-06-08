@@ -287,14 +287,14 @@ def convert_to_xyhw_boxes(boxes: list) -> list:
     return [convert_to_xyhw_box(box.astype(np.int32)) for box in boxes]
 
 
-def competition_map(true_boxes: np.array, true_boxes: np.array, pred_scores:np.array, score_thr) -> float:
+def competition_map(true_boxes: np.array, pred_boxes: np.array, pred_scores:np.array, score_thr) -> float:
     """
     Mean average precision at differnet intersection over union (IoU) threshold
 
     Args:
         true_boxes : Mx4 numpy array of ground true bounding boxes of one image.
                     bbox format: (x1, y1, w, h)
-        true_boxes : Nx4 numpy array of predicted bounding boxes of one image.
+        pred_boxes : Nx4 numpy array of predicted bounding boxes of one image.
                     bbox format: (x1, y1, w, h)
         pred_scores:length N numpy array of scores associated with predicted bboxes
         score_thr  : IoU shreshold to evaluate mean average precision on

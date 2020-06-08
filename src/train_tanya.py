@@ -11,14 +11,12 @@ import pandas as pd
 import torch
 import torch.optim as optim
 import torchvision
-#from albumentations.pytorch.transforms import ToTensor, ToTensorV2
-#from matplotlib import pyplot as plt
-#from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.sampler import SequentialSampler
-#from torchvision import transforms
+
 from tqdm import tqdm
 sys.path.append("../../timm-efficientdet-pytorch")
+sys.path.append("../../omegaconf")
 
 import neptune
 from constants import DATA_DIR, META_TRAIN, TRAIN_DIR
@@ -31,7 +29,7 @@ from helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
                                    preprocess_boxes)
 from helpers.metric import competition_map, find_best_nms_threshold
 from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
-                                   load_weigths)
+                                   load_weights)
 from model_runner import ModelRunner
 
 warnings.filterwarnings('ignore')
@@ -75,158 +73,7 @@ neptune.init('ods/wheat')
 neptune.create_experiment (name=experiment_name,
                           params=PARAMS, 
                           tags=['version_v4'],
-                          upload_source_files=['train_tanya.py'])    
-
-
-def get_lr(optimizer ):
-    for param_group in optimizer.param_groups:
-        return param_group['lr']
-
-
-def set_lr(optimizer, new_lr):
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = new_lr
-
-
-class ModelRunner():
-    def __init__(self, model, device):
-        self.model = model
-        self.device = device
-
-
-    def train_epoch(self, optimizer, generator):
-        self.model.train()
-        tqdm_generator = tqdm(generator, mininterval=30)
-        current_loss_mean = 0
-
-        for batch_idx, (imgs, labels, image_ids) in enumerate(tqdm_generator):            
-            loss = self.train_on_batch(optimizer, imgs, labels, batch_idx)
-            current_loss_mean = (current_loss_mean * batch_idx + loss) / (batch_idx + 1)
-
-            tqdm_generator.set_description('loss: {:.4} lr:{:.6}'.format(
-                current_loss_mean, get_lr(optimizer)))
-        return current_loss_mean
-
-
-    def train_on_batch(self, optimizer, batch_imgs, batch_labels, batch_idx):
-        batch_imgs = torch.stack(batch_imgs)
-        batch_imgs = batch_imgs.to(self.device).float()
-        batch_boxes = [target['boxes'].to(self.device) for target in batch_labels]
-        batch_labels = [target['labels'].to(self.device) for target in batch_labels]
-        loss, _, _ = self.model(batch_imgs, batch_boxes, batch_labels)
-
-        loss.backward()
-
-        optimizer.step()
-        optimizer.zero_grad()
-        return loss.item()
-
-
-    def predict(self, generator):
-        self.model.to(self.device)
-        self.model.eval()
-        tqdm_generator = tqdm(generator)
-        true_list = []
-        pred_boxes = []
-        pred_scores = []
-        for batch_idx, (imgs, true_targets, _) in enumerate(tqdm_generator):
-            if not (true_targets is None):
-                true_list.extend([2 * gt['boxes'].cpu().numpy() for gt in true_targets])
-            imgs = torch.stack(imgs)
-            imgs = imgs.to(self.device).float()
-            with torch.no_grad():
-                predicted = self.model(imgs, torch.tensor([2] * len(imgs)).float().cuda())
-                for i in range(len(imgs)):
-                    pred_boxes.append(predicted[i].detach().cpu().numpy()[:, :4])
-                    pred_scores.append(predicted[i].detach().cpu().numpy()[:, 4])
-            tqdm_generator.set_description('predict')
-        print(pred_scores)
-        #print(pred_boxes)
-
-        return true_list, pred_boxes, pred_scores
-
-
-    def run_train(self, train_generator, val_generator, n_epoches, weights_file, factor, start_lr, min_lr,
-                  lr_patience, overall_patience, loss_delta=0.):
-        self.best_loss = 100
-        self.best_epoch = 0
-        self.curr_lr_loss = 100
-        self.best_lr_epoch = 0
-
-        self.model.to(self.device)
-        #params = [p for p in self.model.parameters() if p.requires_grad]
-        optimizer = optim.AdamW(params=self.model.parameters(), lr=start_lr)
-
-        for epoch in range(n_epoches):
-            print('!!!! Epoch {}'.format(epoch))
-            train_loss = self.train_epoch(optimizer, train_generator)
-            print(f'Train loss: {train_loss}, lr: {get_lr(optimizer)}')
-            neptune.log_metric('Train loss', train_loss)
-            neptune.log_metric('Lr', get_lr(optimizer))
-            
-            if not self.on_epoch_end(epoch, optimizer, val_generator, weights_file, factor, min_lr, lr_patience, overall_patience, loss_delta):
-                break
-      
-
-    def on_epoch_end(self, epoch, optimizer, val_generator, weights_file, factor, min_lr, lr_patience, overall_patience, loss_delta):
-        
-        tqdm_generator = tqdm(val_generator, mininterval=30)
-        current_loss = 0
-        true_list, pred_boxes, pred_scores = [], [], []
-
-        self.model.eval()
-        with torch.no_grad():
-            for batch_idx, (batch_imgs, batch_labels, image_id) in enumerate(tqdm_generator):
-                batch_imgs = torch.stack(batch_imgs)
-                batch_imgs = batch_imgs.to(self.device).float()
-                batch_boxes = [target['boxes'].to(self.device) for target in batch_labels]
-                batch_labels = [target['labels'].to(self.device) for target in batch_labels]
-                
-                loss, _, _ = self.model(batch_imgs, batch_boxes, batch_labels)
-                loss_value = loss.item()                
-                current_loss = (current_loss * batch_idx + loss_value) / (batch_idx + 1)     
-        
-        # validate loss
-        print('validation loss: ', current_loss)
-        neptune.log_metric('Validation loss', current_loss)
-        # validate metric
-        nms_thr = 0.37
-        true_list, pred_boxes, pred_scores = self.predict(val_generator)
-        cur_metric = competition_metric(true_list, pred_boxes, pred_scores, nms_thr)
-        print('Validation mAP', cur_metric)
-        neptune.log_metric('Validation mAP', cur_metric)
-        neptune.log_text('nms_threshold', str(nms_thr))
-        
-        if current_loss < self.best_loss - loss_delta:
-            print(f'\nLoss has been improved from {self.best_loss} to {current_loss}')
-            self.best_loss = current_loss
-            self.best_epoch = epoch
-            torch.save(self.model.model.state_dict(), weights_file)
-        else:
-            print(f'\nLoss has not been improved from {self.best_loss}')  
-            
-        if epoch - self.best_epoch > overall_patience:
-            print('\nEarly stop: training finished with patience!')
-            return False 
-
-        print('curr_lr_loss', self.curr_lr_loss)
-        if current_loss >= self.curr_lr_loss - loss_delta:
-            print('curr_lr_loss not improved')
-            old_lr = float(get_lr(optimizer))
-            print('old_lr', old_lr)
-            if old_lr > min_lr and epoch - self.best_lr_epoch > lr_patience:
-                new_lr = old_lr * factor
-                new_lr = max(new_lr, min_lr)
-                print('new_lr', new_lr)
-                set_lr(optimizer, new_lr)
-                self.curr_lr_loss = 100
-                self.best_lr_epoch = epoch
-                print('\nEpoch %05d: ReduceLROnPlateau reducing learning rate to %s.' % (epoch, new_lr))
-        else:
-            print('curr_lr_loss improved')
-            self.curr_lr_loss = current_loss
-            self.best_lr_epoch = epoch
-        return True
+                          upload_source_files=['train_tanya.py'])   
 
 
 def main() -> None:
@@ -236,14 +83,13 @@ def main() -> None:
     train_boxes_df = pd.read_csv(META_TRAIN)
     train_boxes_df = preprocess_boxes(train_boxes_df)
     train_images_df = pd.read_csv('orig_alex_folds.csv')    
-    print(f'\nTotal images: {len(train_images_df['image_id'].unique())}')
+    print(f'\nTotal images: {len(train_images_df.image_id.unique())}')
     
     # Leave only images with bboxes
     image_id_column = 'image_id'
     print('Leave only train images with boxes (all)')
     with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
-    print(f'\nImages with bboxes: {len(with_boxes_filter['image_id'].unique())}')
-
+    
     # train/val images
     images_val = train_images_df.loc[
         (train_images_df['fold'] == fold) & with_boxes_filter, image_id_column].values
@@ -301,7 +147,7 @@ def main() -> None:
     else:
         print(f'Use coco pretrain')
         pretrain = get_effdet_pretrain_names(model_name)
-        load_weights(net, '../timm-efficientdet-pytorch/{pretrain}')
+        load_weights(net, '../../timm-efficientdet-pytorch/{pretrain}')
     model = DetBenchTrain(net, config)
 
     runner = ModelRunner(model, device)

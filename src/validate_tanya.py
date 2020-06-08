@@ -3,6 +3,8 @@ import random
 import sys
 import warnings
 sys.path.append("../../timm-efficientdet-pytorch")
+sys.path.append("../../omegaconf")
+
 
 import albumentations as A
 #import cv2
@@ -10,10 +12,10 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.optim as optim
-import torchvision
-from albumentations.pytorch.transforms import ToTensor, ToTensorV2
+#import torchvision
+#from albumentations.pytorch.transforms import ToTensor, ToTensorV2
 from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.sampler import SequentialSampler
+#from torch.utils.data.sampler import SequentialSampler
 #from torchvision import transforms
 from tqdm import tqdm
 
@@ -30,18 +32,13 @@ from helpers.image_helpers import load_image
 #from matplotlib import pyplot as plt
 from helpers.metric import competition_map, iou, map_iou
 from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
-                                   load_weigths)
+                                   load_weights)
 from model_runner import ModelRunner
 
 warnings.filterwarnings('ignore')
 
 #import re
 #from PIL import Image
-
-
-model_name = 'effdet4'
-experiment_name = f'{model_name}_fold{fold}_{image_size}'
-experiment_tag = 'run1'
 
 fold = 3
 num_workers = 2
@@ -50,6 +47,10 @@ inf_batch_size = 16
 image_size = 512
 gpu_number=1
 
+model_name = 'effdet4'
+experiment_name = f'{model_name}_fold{fold}_{image_size}'
+experiment_tag = 'run1'
+
 
 def main() -> None:
     device = f"cuda:{gpu_number}" if torch.cuda.is_available() else torch.device('cpu')
@@ -57,18 +58,23 @@ def main() -> None:
 
     train_boxes_df = pd.read_csv(META_TRAIN)
     train_boxes_df = preprocess_boxes(train_boxes_df)
-    train_images_df = pd.read_csv('orig_alex_folds.csv')    
-    print(f'\nTotal images: {len(train_images_df['image_id'].unique())}')
+    print(train_boxes_df.head())
+    #train_images_df = pd.read_csv('orig_alex_folds.csv')    
+    image_id_column = 'image_id'
+    train_images_df = pd.read_csv('folds/train_alex_folds.csv')    
+    print(f'\nTotal images: {len(train_images_df[image_id_column].unique())}')
     
     # Leave only images with bboxes
-    image_id_column = 'image_id'
-    print('Leave only train images with boxes (all)')
-    with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
-    print(f'\nImages with bboxes: {len(with_boxes_filter['image_id'].unique())}')
-
+    #print('Leave only train images with boxes (all)')
+    img_list = train_boxes_df[image_id_column].unique()
+    print(len(img_list))
+    with_boxes_filter = train_images_df[image_id_column].isin(img_list)
+        
+    fold = 0
     # val images
-    images_val = train_images_df.loc[
-        (train_images_df['fold'] == fold) & with_boxes_filter, image_id_column].values       
+    images_val = img_list
+    #images_val = train_images_df.loc[
+    #    (train_images_df['fold'] == fold) & with_boxes_filter, image_id_column].values       
     print(f'\nValidation images {len(images_val)}')
     
     # get dataset
@@ -80,7 +86,7 @@ def main() -> None:
                                 transforms=get_valid_transforms(image_size), 
                                 is_test=True
                                 )
-     valid_data_loader = DataLoader(
+    valid_data_loader = DataLoader(
         valid_dataset,
         batch_size=inf_batch_size,
         shuffle=False,
@@ -97,9 +103,7 @@ def main() -> None:
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
     weights_file = f'{experiment_name}.pth'
-    #weights_file = '../Weights/effdet_fold_1_model16_alex_fold1.pth'
-    
-    # continue training
+        
     if os.path.exists(weights_file):    
         print(f'Loading weights from: {weights_file}')
         load_weights(net, weights_file)         
@@ -109,14 +113,14 @@ def main() -> None:
 
     # get predictions
     manager = ModelRunner(model, device)
-    true_list, pred_boxes, pred_scores = manager.predict(valid_data_loader)
+    true_boxes, pred_boxes, pred_scores = manager.predict(valid_data_loader)
 
     nms_thresholds = np.linspace(min_thres, max_thres, num=points, endpoint=False)     
     best_metric = 0
 
     for thr in nms_thresholds:
         print('thr', thr)
-        cur_metric = competition_metric(true_list, pred_boxes, pred_scores, thr)
+        cur_metric = competition_metric(true_boxes, pred_boxes, pred_scores, thr)
         if cur_metric > best_metric:
             best_thr = thr
             best_metric = cur_metric
