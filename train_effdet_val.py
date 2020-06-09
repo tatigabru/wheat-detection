@@ -116,12 +116,11 @@ def filter_box_size(train_boxes_df: pd.DataFrame, min_size: Optional[int] = None
         Output:
             pd.DataFrame with filtered boxes
     """
-    train_boxes_df['area'] = train_boxes_df['w'] * train_boxes_df['h']  
     if min_size:      
-        size_filter = train_boxes_df['w'] > min_size & train_boxes_df['h'] > min_size
+        size_filter = (train_boxes_df['w'] > min_size) & (train_boxes_df['h'] > min_size)
         train_boxes_df = train_boxes_df[size_filter] 
     if max_size:      
-        size_filter = train_boxes_df['w'] < max_size & train_boxes_df['h'] < max_size
+        size_filter = (train_boxes_df['w'] < max_size) & (train_boxes_df['h'] < max_size)
         train_boxes_df = train_boxes_df[size_filter] 
 
     return train_boxes_df
@@ -479,8 +478,9 @@ class ModelManager():
         return loss.item()
 
     def predict(self, generator):
-        self.model.to(self.device)
         self.model.eval()
+        self.model.to(self.device)
+        
         tqdm_generator = tqdm(generator)
         true_list = []
         pred_boxes = []
@@ -491,7 +491,7 @@ class ModelManager():
             imgs = torch.stack(imgs)
             imgs = imgs.to(self.device).float()
             with torch.no_grad():
-                predicted = self.model(imgs, torch.tensor([2] * len(imgs)).float().cuda())
+                predicted = self.model(imgs, torch.tensor([2] * len(imgs)).float().to(self.device))
                 for i in range(len(imgs)):
                     pred_boxes.append(predicted[i].detach().cpu().numpy()[:, :4])
                     pred_scores.append(predicted[i].detach().cpu().numpy()[:, 4])
@@ -603,17 +603,16 @@ def do_main():
     print('Leave only train images with boxes (all)')
     with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
 
-    fold_ = fold
     images_val = train_images_df.loc[
-        (train_images_df[fold_column] == fold_) & with_boxes_filter, image_id_column].values
+        (train_images_df[fold_column] == fold) & with_boxes_filter, image_id_column].values
     images_train = train_images_df.loc[
-        (train_images_df[fold_column] != fold_) & with_boxes_filter, image_id_column].values
+        (train_images_df[fold_column] != fold) & with_boxes_filter, image_id_column].values
      
     print(len(images_train), len(images_val))
 
-    train_dataset = WheatDataset(images_train, DIR_TRAIN, train_box_callback,
+    train_dataset = WheatDataset(images_train[:16], DIR_TRAIN, train_box_callback,
                                  transforms=get_train_transform(), is_test=False)
-    valid_dataset = WheatDataset(images_val, DIR_TRAIN, train_box_callback,
+    valid_dataset = WheatDataset(images_val[:16], DIR_TRAIN, train_box_callback,
                                  transforms=get_valid_transform(), is_test=True)
 
     train_data_loader = DataLoader(

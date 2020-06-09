@@ -393,8 +393,8 @@ class ModelManager():
         return loss.item()
 
     def predict(self, generator):
-        self.model.to(self.device)
         self.model.eval()
+        self.model.to(self.device)
         tqdm_generator = tqdm(generator)
         true_list = []
         pred_boxes = []
@@ -405,7 +405,7 @@ class ModelManager():
             imgs = torch.stack(imgs)
             imgs = imgs.to(self.device).float()
             with torch.no_grad():
-                predicted = self.model(imgs, torch.tensor([2] * len(imgs)).float().cuda())
+                predicted = self.model(imgs, torch.tensor([2]*img.shape[0]).float().to(self.device))
                 for i in range(len(imgs)):
                     pred_boxes.append(predicted[i].detach().cpu().numpy()[:, :4])
                     pred_scores.append(predicted[i].detach().cpu().numpy()[:, 4])
