@@ -503,6 +503,7 @@ class ModelManager():
     def run_train(self, train_generator, val_generator, n_epoches, weights_file, factor, start_lr, min_lr,
                   lr_patience, overall_patience, loss_delta=0.):
         self.best_loss = 100
+        self.best_metric = 0
         self.best_epoch = 0
         self.curr_lr_loss = 100
         self.best_lr_epoch = 0
