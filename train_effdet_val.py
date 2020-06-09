@@ -22,6 +22,7 @@ sys.path.append("../timm-efficientdet-pytorch")
 import neptune
 from effdet import DetBenchTrain, EfficientDet, get_efficientdet_config
 from effdet.efficientdet import HeadNet
+from typing import Optional
 
 warnings.filterwarnings('ignore')
 
@@ -69,7 +70,7 @@ PARAMS = {'fold' : fold,
          }
 
 # Create experiment with defined parameters
-neptune.create_experiment (name=emodel_name,
+neptune.create_experiment (name=model_name,
                           params=PARAMS, 
                           tags=[experiment_name, experiment_tag],
                           upload_source_files=['train_effdet_val.py'])    
@@ -479,19 +480,20 @@ class ModelManager():
 
     def predict(self, generator):
         self.model.eval()
-        self.model.to(self.device)
+        #self.model.to(self.device) # akready there
         
         tqdm_generator = tqdm(generator)
         true_list = []
         pred_boxes = []
         pred_scores = []
-        for batch_idx, (imgs, true_targets, _) in enumerate(tqdm_generator):
-            if not (true_targets is None):
-                true_list.extend([2 * gt['boxes'].cpu().numpy() for gt in true_targets])
-            imgs = torch.stack(imgs)
-            imgs = imgs.to(self.device).float()
-            with torch.no_grad():
+        with torch.no_grad():
+            for batch_idx, (imgs, true_targets, _) in enumerate(tqdm_generator):            
+                if not (true_targets is None):
+                    true_list.extend([2 * gt['boxes'].cpu().numpy() for gt in true_targets])
+                imgs = torch.stack(imgs)
+                imgs = imgs.to(self.device).float()            
                 predicted = self.model(imgs, torch.tensor([2] * len(imgs)).float().to(self.device))
+
                 for i in range(len(imgs)):
                     pred_boxes.append(predicted[i].detach().cpu().numpy()[:, :4])
                     pred_scores.append(predicted[i].detach().cpu().numpy()[:, 4])
