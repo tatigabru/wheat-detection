@@ -22,9 +22,12 @@ sys.path.append("../timm-efficientdet-pytorch")
 import neptune
 from effdet import DetBenchTrain, EfficientDet, get_efficientdet_config
 from effdet.efficientdet import HeadNet
+from scr.helpers.model_helpers import set_seed, get_effdet_pretrain_names
 
 warnings.filterwarnings('ignore')
 
+
+set_seed(1234)
 
 print(torch.__version__)
 print(neptune.__version__)
@@ -50,7 +53,7 @@ overall_patience=10
 loss_delta=1e-4
 gpu_number=1
 
-model_name = 'effdet5'
+model_name = 'effdet7'
 experiment_name = f'{model_name}_fold{fold}_{our_image_size}'
 experiment_tag = 'v1'
 
@@ -631,11 +634,14 @@ def do_main():
         collate_fn=collate_fn
     )
 
-    #config = get_efficientdet_config('tf_efficientdet_d4')
-    config = get_efficientdet_config('tf_efficientdet_d5')
+    
+
+
+    config = get_efficientdet_config(f'tf_efficientdet_d{model_name[-1]}')
+    #config = get_efficientdet_config('tf_efficientdet_d5')
     net = EfficientDet(config, pretrained_backbone=False)
-    #load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d4-5b370b7a.pth')
-    load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d5-ef44aea8.pth')
+    load_weights(net, f'../timm-efficientdet-pytorch/{get_effdet_pretrain_names[model_name]}')
+    #load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d5-ef44aea8.pth')
     
     config.num_classes = 1
     config.image_size = our_image_size
