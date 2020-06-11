@@ -24,13 +24,12 @@ from effdet import DetBenchTrain, DetBenchEval, EfficientDet, get_efficientdet_c
 from effdet.efficientdet import HeadNet
 from typing import Optional, List, Tuple
 
-from src.helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
+from src.helpers.boxes_helpers import (filter_box_area, filter_box_size,
                                    preprocess_boxes)
 from src.helpers.metric import competition_metric, find_best_nms_threshold
-from src.helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
-                                   load_weights)
+from src.helpers.model_helpers import (collate_fn, get_effdet_pretrain_names)
 
-from src.datasets.dataset_sergey import WheatDataset
+#from src.datasets.dataset_sergey import WheatDataset
 from src.datasets.get_transforms import (get_train_transforms, get_transforms,
                                      get_valid_transforms, set_augmentations)
 
