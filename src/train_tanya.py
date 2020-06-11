@@ -87,7 +87,7 @@ def main() -> None:
     
     # Leave only images with bboxes
     image_id_column = 'image_id'
-    print('Leave only train images with boxes (all)')
+    print('Leave only train images with boxes')
     with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
     
     # train/val images
