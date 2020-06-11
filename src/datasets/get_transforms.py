@@ -40,59 +40,49 @@ class TransformsCfgs():
 
 def set_augmentations(img_size: int = 512):   
 
-    hard_augs = [             
-                    A.RandomSizedCrop(min_max_height=(800, 800), height=img_size, width=img_size, p=0.5),
-                    # Add occasion blur
-                    A.OneOf([A.GaussianBlur(), A.GaussNoise(), A.NoOp()]),
-                    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5),    
-                    # D4 Augmentations
-                    A.HorizontalFlip(p=0.5),
-                    A.VerticalFlip(p=0.5),
-                    A.RandomRotate90(p=0.5),
-                    A.Transpose(p=0.2),
-                    # Cutout,p=0.5
-                    A.Cutout(num_holes=8, max_h_size=img_size // 8, max_w_size=img_size // 8, fill_value=0, p=0.5),
-                    # Spatial-preserving augmentations:
-                    A.OneOf(
-                        [   A.RandomBrightnessContrast(brightness_by_max=True),
-                            A.HueSaturationValue(),
-                            A.RGBShift(),
-                            A.RandomGamma(),                            
-                        ], p=0.9
-                    ),
-                    # Weather effects                    
-                    A.OneOf(
-                        [ A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.2), 
-                          A.RandomRain( p=0.2),
-                        ]
-                    ),                 
-            ]   
-
-    medium_augs = [
-            A.RandomSizedCrop(min_max_height=(800, 800), height=img_size, width=img_size, p=0.5),
-            A.Resize(height=IMG_SIZE, width=IMG_SIZE, p=1.0),
-            A.OneOf([
-                    A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit= 0.2, 
-                                        val_shift_limit=0.2, p=0.9),
-                    A.RandomBrightnessContrast(brightness_limit=0.2, 
-                                            contrast_limit=0.2, p=0.9),
-                ],p=0.9),                  
-            # noise                
-            A.OneOf([
-                    A.GaussNoise(p=0.5),                 
-                    A.RandomGamma(p=0.4),                    
-                    ],p=0.7),
-                # D4 transforms
+    hard_augs = [ 
+                A.RandomResizedCrop(height=img_size, width=img_size, scale=(0.5, 1.5), ratio=(0.75, 1.25), p=0.5),            
+                #A.RandomSizedCrop(min_max_height=(512, 1024), height=img_size, width=img_size, p=0.5),
+                A.Resize(height=img_size width=img_size, p=1.0),
+                # Add occasion blur
+                A.OneOf([A.GaussianBlur(), MotionBlur()]),
+                A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5), 
+                # noise                
+                A.OneOf([
+                        A.GaussNoise(p=0.5),                 
+                        A.RandomGamma(p=0.4),                    
+                        ],p=0.5),   
+                # D4 Augmentations
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
                 A.Transpose(p=0.2),
-                # Cutout, p=0.5
-                A.Cutout(num_holes=8, max_h_size=img_size // 8, max_w_size=img_size // 8, fill_value=0, p=0.5),
+                # Spatial-preserving augmentations
+                A.RandomBrightnessContrast(brightness_by_max=True, p=0.8),
+                A.HueSaturationValue(p=0.7),                                                   
+            ]   
+
+    medium_augs = [
+            A.RandomSizedCrop(min_max_height=(512, 1024), height=img_size, width=img_size, p=0.5),
+            A.Resize(height=img_size width=img_size, p=1.0),
+            A.OneOf([
+                    A.HueSaturationValue(p=0.9),
+                    A.RandomBrightnessContrast(p=0.9),
+                ],p=0.5),                  
+            # noise                
+            A.OneOf([
+                    A.GaussNoise(p=0.5),                 
+                    A.RandomGamma(p=0.4),                    
+                    ],p=0.5),
+            # D4 transforms
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            A.Transpose(p=0.2),                
             ]   
 
     light_augs = [
-            A.RandomSizedCrop(min_max_height=(800, 800), height=1024, width=1024, p=0.5),
+            A.RandomSizedCrop(min_max_height=(800, 1024), height=img_size, width=img_size, p=0.5),
             A.Resize(height=img_size, width=img_size, p=1),
             A.OneOf([
                 A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit=0.2,
@@ -104,9 +94,7 @@ def set_augmentations(img_size: int = 512):
             # D4 transforms
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            # Cutout,p=0.5
-            A.Cutout(num_holes=8, max_h_size=img_size // 8, max_w_size=img_size // 8, fill_value=0, p=0.5)
+            A.RandomRotate90(p=0.5),            
             ]
 
     d4_augs = [
@@ -119,13 +107,26 @@ def set_augmentations(img_size: int = 512):
 
     resize = A.Resize(height=img_size, width=img_size, p=1.0)
 
+    # Cutout,p=0.5
+    cutout = A.Cutout(num_holes=8, max_h_size=img_size // 8, max_w_size=img_size // 8, fill_value=0, p=0.5)
+
+    # Weather effects                    
+    weather = [
+            A.OneOf(
+                    [ A.RandomFog(fog_coef_lower=0.01, fog_coef_upper=0.3, p=0.2), 
+                      A.RandomRain( p=0.2),
+                    ], p=0.5),
+            ]
+
     # dictionary of transforms
     transforms_dict = {
         "d4": d4_augs,
         "hard": hard_augs,
         "medium": medium_augs,
         "light": light_augs,
-        "resize": resize,     
+        "resize": resize,   
+        "cutout": cutout,  
+        "weather": weather,
         }
 
     return transforms_dict  

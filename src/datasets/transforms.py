@@ -146,8 +146,7 @@ hard_augmentations = [
                     A.OneOf([A.CoarseDropout()),
                     # Spatial-preserving augmentations:
                     A.OneOf(
-                        [   A.RandomBrightnessContrast(brightness_by_max=True),
-                            A.CLAHE(),
+                        [   A.RandomBrightnessContrast(brightness_by_max=True),                            
                             A.HueSaturationValue(),
                             A.RGBShift(),
                             A.RandomGamma(),                            

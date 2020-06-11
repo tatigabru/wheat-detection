@@ -20,9 +20,19 @@ from torchvision import transforms
 from tqdm import tqdm
 sys.path.append("../timm-efficientdet-pytorch")
 import neptune
-from effdet import DetBenchTrain, EfficientDet, get_efficientdet_config
+from effdet import DetBenchTrain, DetBenchEval, EfficientDet, get_efficientdet_config
 from effdet.efficientdet import HeadNet
-from typing import Optional
+from typing import Optional, List, Tuple
+
+from src.helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
+                                   preprocess_boxes)
+from src.helpers.metric import competition_metric, find_best_nms_threshold
+from src.helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
+                                   load_weights)
+
+from src.datasets.dataset_sergey import WheatDataset
+from src.datasets.get_transforms import (get_train_transforms, get_transforms,
+                                     get_valid_transforms, set_augmentations)
 
 warnings.filterwarnings('ignore')
 
@@ -32,7 +42,7 @@ print(neptune.__version__)
 
 neptune.init('ods/wheat')
 
-DATA_DIR = '../../data'
+DATA_DIR = '../Data'
 DIR_TRAIN = f'{DATA_DIR}/train'
 DIR_TEST = f'{DATA_DIR}/test'
 fold_column = 'fold'
@@ -51,7 +61,7 @@ overall_patience=10
 loss_delta=1e-4
 gpu_number=1
 
-model_name = 'effdet5'
+model_name = 'effdet4'
 experiment_name = f'{model_name}_fold{fold}_{our_image_size}'
 experiment_tag = 'v1'
 
@@ -73,61 +83,16 @@ PARAMS = {'fold' : fold,
 neptune.create_experiment (name=model_name,
                           params=PARAMS, 
                           tags=[experiment_name, experiment_tag],
-                          upload_source_files=['train_effdet_val.py'])    
+                          upload_source_files=['train_effdet_val-fix.py'])    
 
 neptune.append_tags(f'fold_{fold}')
 
 train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'fixed_train.csv'))
 train_images_df = pd.read_csv(os.path.join(DATA_DIR,'orig_alex_folds.csv'))
 
-train_boxes_df['x'] = -1
-train_boxes_df['y'] = -1
-train_boxes_df['w'] = -1
-train_boxes_df['h'] = -1
-
-def expand_bbox(x):
-    r = np.array(re.findall("([0-9]+[.]?[0-9]*)", x))
-    if len(r) == 0:
-        r = [-1, -1, -1, -1]
-    return r
-
-train_boxes_df[['x', 'y', 'w', 'h']] = np.stack(train_boxes_df['bbox'].apply(lambda x: expand_bbox(x)))
-train_boxes_df.drop(columns=['bbox'], inplace=True)
-train_boxes_df['x'] = train_boxes_df['x'].astype(np.float)
-train_boxes_df['y'] = train_boxes_df['y'].astype(np.float)
-train_boxes_df['w'] = train_boxes_df['w'].astype(np.float)
-train_boxes_df['h'] = train_boxes_df['h'].astype(np.float)
-
-train_boxes_df['area'] = train_boxes_df['w'] * train_boxes_df['h']
-area_filter = (train_boxes_df['area'] < 160000) & (train_boxes_df['area'] > 50)
-if False:
-    train_boxes_df = train_boxes_df[area_filter]
-else:
-    print('No filtering for boxes')
-
-
-def filter_box_size(train_boxes_df: pd.DataFrame, min_size: Optional[int] = None, max_size: Optional[int] = 700) -> pd.DataFrame:
-    """
-    Apply filtering for boxes by size
-        Args:
-            boxes_df: pd.DataFrame with train boxes coordinates
-            min_size: boxes with the h, w below minimum are removed
-            max_size: boxes with the h, w above maximum are removed
-
-        Output:
-            pd.DataFrame with filtered boxes
-    """
-    if min_size:      
-        size_filter = (train_boxes_df['w'] > min_size) & (train_boxes_df['h'] > min_size)
-        train_boxes_df = train_boxes_df[size_filter] 
-    if max_size:      
-        size_filter = (train_boxes_df['w'] < max_size) & (train_boxes_df['h'] < max_size)
-        train_boxes_df = train_boxes_df[size_filter] 
-
-    return train_boxes_df
-
+train_boxes_df = preprocess_boxes(train_boxes_df)
 # filter tiny boxes as well
-train_boxes_df = filter_box_size(train_boxes_df, min_size = 10)
+#train_boxes_df = filter_box_size(train_boxes_df, min_size = 10)
 
 
 def train_box_callback(image_id):
@@ -170,6 +135,14 @@ class WheatDataset(Dataset):
             image, boxes = self.load_cutmix_image_and_boxes(index)
             assert len(boxes) > 0
 
+        if self.is_test:
+            original_boxes = np.array(boxes, copy=True, dtype=int)
+            # back to coco format
+            original_boxes[:, 2] = original_boxes[:, 2] - original_boxes[:, 0]
+            original_boxes[:, 3] = original_boxes[:, 3] - original_boxes[:, 1]
+        else:
+            # doesn't matter
+            original_boxes = []
         n_boxes = len(boxes)
         class_id = 1
 
@@ -213,6 +186,7 @@ class WheatDataset(Dataset):
         target['boxes'] = boxes
         target['labels'] = labels
         target['image_id'] = torch.tensor([index])
+        target['original_boxes'] = original_boxes
 
         return transforms.ToTensor()(image), target, self.image_ids[index]
 
@@ -279,28 +253,7 @@ class WheatDataset(Dataset):
             np.where((result_boxes[:, 2] - result_boxes[:, 0]) * (result_boxes[:, 3] - result_boxes[:, 1]) > 0)]
         return result_image, result_boxes
 
-# Albumentations
-def get_train_transform():
-    return A.Compose([
-        A.RandomSizedCrop(min_max_height=(800, 800), height=1024, width=1024, p=0.5),
-        A.OneOf([
-            A.HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit=0.2,
-                                 val_shift_limit=0.2, p=0.9),
-            A.RandomBrightnessContrast(brightness_limit=0.2,
-                                       contrast_limit=0.2, p=0.9),
-        ], p=0.9),
-        A.ToGray(p=0.01),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.Resize(height=our_image_size, width=our_image_size, p=1),
-        A.Cutout(num_holes=8, max_h_size=our_image_size // 8, max_w_size=our_image_size // 8, fill_value=0, p=0.5)
-    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
 
-
-def get_valid_transform():
-    return A.Compose([
-        A.Resize(height=our_image_size, width=our_image_size, p=1)
-    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
 
 # helper function to calculate IoU
 def iou(box1, box2):
@@ -383,18 +336,8 @@ def convert_to_xyhw_boxes(boxes):
     return [convert_to_xyhw_box(box.astype(np.int32)) for box in boxes]
 
 
+# boxes in coco format!
 def competition_metric(true_boxes, pred_boxes, pred_scores, score_thr):
-    """
-    print(len(true_boxes))
-    print(len(pred_boxes))
-    print(len(pred_scores))
-    print(true_boxes[0])
-    print(pred_boxes[0])
-    print(pred_scores[0])
-    """
-
-    true_boxes = [convert_to_xyhw_boxes(x) for x in true_boxes]
-    pred_boxes = [convert_to_xyhw_boxes(x) for x in pred_boxes]
     assert len(true_boxes) == len(pred_boxes)
     n_images = len(true_boxes)
 
@@ -403,8 +346,8 @@ def competition_metric(true_boxes, pred_boxes, pred_scores, score_thr):
     ntps = 0
     overall_maps = 0
     for ind in range(n_images):
-        cur_image_true_boxes = np.array(true_boxes[ind])
-        cur_image_pred_boxes = np.array(pred_boxes[ind])
+        cur_image_true_boxes = np.array(true_boxes[ind], copy=False)
+        cur_image_pred_boxes = np.array(pred_boxes[ind], copy=False)
         cur_pred_scores = pred_scores[ind]
         score_filter = cur_pred_scores >= score_thr
         cur_image_pred_boxes = cur_image_pred_boxes[score_filter]
@@ -415,17 +358,17 @@ def competition_metric(true_boxes, pred_boxes, pred_scores, score_thr):
         elif (cur_image_true_boxes.shape[0] > 0):  # actual positive
             ns = ns + 1  # increment denominator & add contribution to numerator
             contrib = map_iou(cur_image_true_boxes, cur_image_pred_boxes, cur_pred_scores)
-            # print('contrib', contrib)
             overall_maps = overall_maps + contrib
             if (cur_image_pred_boxes.shape[0] > 0):  # true positive
                 ntps = ntps + 1  # track number of true positive cases, for curiosity
     overall_maps = overall_maps / (ns + 1e-7)
-    print("ns:  ", ns)
-    print("False positive cases:  ", nfps)
-    print("True positive cases: ", ntps)
-    print("Overall evaluation score: ", overall_maps)
+    print("\nSamples:  ", ns)
+    print("\nFalse positive cases:  ", nfps)
+    print("\nTrue positive cases: ", ntps)
+    print("\nOverall evaluation score: ", overall_maps)
 
     return overall_maps
+
 
 def collate_fn(batch):
     return tuple(zip(*batch))
@@ -441,23 +384,20 @@ def set_lr(optimizer, new_lr):
 def load_weights(model, weights_file):
     model.load_state_dict(torch.load(weights_file))
 
+
 class ModelManager():
-    def __init__(self, model, device):
-        self.model = model
+    def __init__(self, train_model, eval_model, device):
+        self.train_model = train_model
+        self.eval_model = eval_model
         self.device = device
 
     def train_epoch(self, optimizer, generator):
-        self.model.train()
+        self.train_model.train()
         tqdm_generator = tqdm(generator, mininterval=30)
         current_loss_mean = 0
 
         for batch_idx, (imgs, labels, image_id) in enumerate(tqdm_generator):
-            #if batch_idx == 0:
-            #   print('first batch is', image_id)
-            #if batch_idx > 5:
-            #    break
             loss = self.train_on_batch(optimizer, imgs, labels, batch_idx)
-
             # just slide average
             current_loss_mean = (current_loss_mean * batch_idx + loss) / (batch_idx + 1)
 
@@ -470,7 +410,7 @@ class ModelManager():
         batch_imgs = batch_imgs.to(self.device).float()
         batch_boxes = [target['boxes'].to(self.device) for target in batch_labels]
         batch_labels = [target['labels'].to(self.device) for target in batch_labels]
-        loss, _, _ = self.model(batch_imgs, batch_boxes, batch_labels)
+        loss, _, _ = self.train_model(batch_imgs, batch_boxes, batch_labels)
 
         loss.backward()
 
@@ -479,27 +419,53 @@ class ModelManager():
         return loss.item()
 
     def predict(self, generator):
-        self.model.eval()
-        #self.model.to(self.device) # akready there
+        self.eval_model.eval()
+        self.eval_model.to(self.device)
         
         tqdm_generator = tqdm(generator)
         true_list = []
         pred_boxes = []
         pred_scores = []
-        with torch.no_grad():
-            for batch_idx, (imgs, true_targets, _) in enumerate(tqdm_generator):            
-                if not (true_targets is None):
-                    true_list.extend([2 * gt['boxes'].cpu().numpy() for gt in true_targets])
-                imgs = torch.stack(imgs)
-                imgs = imgs.to(self.device).float()            
-                predicted = self.model(imgs, torch.tensor([2] * len(imgs)).float().to(self.device))
 
+        # sorry, now just hardcoded :(
+        original_image_size = our_image_size # not 1024 as we resize train and val the same way
+
+        with torch.no_grad():
+            for batch_idx, (imgs, true_targets, _) in enumerate(tqdm_generator):
+                if not (true_targets is None):
+                    true_list.extend([gt['original_boxes'] for gt in true_targets])
+                imgs = torch.stack(imgs)
+                imgs = imgs.to(self.device).float()
+            
+                predicted = self.eval_model(imgs, torch.tensor([2] * len(imgs)).float().to(self.device))
                 for i in range(len(imgs)):
-                    pred_boxes.append(predicted[i].detach().cpu().numpy()[:, :4])
-                    pred_scores.append(predicted[i].detach().cpu().numpy()[:, 4])
+                    cur_boxes = predicted[i].detach().cpu().numpy()[:, :4]
+                    cur_boxes = np.array(cur_boxes, dtype=int)
+                    cur_scores = predicted[i].detach().cpu().numpy()[:, 4]
+
+                    # to pascal format
+                    cur_boxes[:, 2] = cur_boxes[:, 0] + cur_boxes[:, 2]
+                    cur_boxes[:, 3] = cur_boxes[:, 1] + cur_boxes[:, 3]
+
+                    # clip by image edges
+                    cur_boxes[:, 0] = np.clip(cur_boxes[:, 0], 0, original_image_size)
+                    cur_boxes[:, 2] = np.clip(cur_boxes[:, 2], 0, original_image_size)
+                    cur_boxes[:, 1] = np.clip(cur_boxes[:, 1], 0, original_image_size)
+                    cur_boxes[:, 3] = np.clip(cur_boxes[:, 3], 0, original_image_size)
+
+                    # to coco format
+                    cur_boxes[:, 2] = cur_boxes[:, 2] - cur_boxes[:, 0]
+                    cur_boxes[:, 3] = cur_boxes[:, 3] - cur_boxes[:, 1]
+
+                    # drop strange boxes
+                    cur_filter = (cur_boxes[:, 2] > 0) & (cur_boxes[:, 3] > 0)
+                    cur_boxes = cur_boxes[cur_filter]
+                    cur_scores = cur_scores[cur_filter]
+                    assert len(cur_boxes) == len(cur_scores)
+
+                    pred_boxes.append(cur_boxes)
+                    pred_scores.append(cur_scores)
             tqdm_generator.set_description('predict')
-        print(pred_scores)
-        #print(pred_boxes)
         return true_list, pred_boxes, pred_scores
 
     def run_train(self, train_generator, val_generator, n_epoches, weights_file, factor, start_lr, min_lr,
@@ -510,9 +476,9 @@ class ModelManager():
         self.curr_lr_loss = 100
         self.best_lr_epoch = 0
 
-        self.model.to(self.device)
-        #params = [p for p in self.model.parameters() if p.requires_grad]
-        optimizer = optim.AdamW(params=self.model.parameters(), lr=start_lr)
+        self.train_model.to(self.device)
+        #params = [p for p in self.train_model.parameters() if p.requires_grad]
+        optimizer = optim.AdamW(params=self.train_model.parameters(), lr=start_lr)
 
         for epoch in range(n_epoches):
             print('!!!! Epoch {}'.format(epoch))
@@ -524,20 +490,18 @@ class ModelManager():
             if not self.on_epoch_end(epoch, optimizer, val_generator, weights_file, factor, min_lr, lr_patience, overall_patience, loss_delta):
                 break
       
-
     def on_epoch_end(self, epoch, optimizer, val_generator, weights_file, factor, min_lr, lr_patience, overall_patience, loss_delta):
-        #true_boxes, pred_boxes, pred_scores = self.predict(val_generator)
-        #current_loss = competition_loss(true_boxes,  pred_boxes, pred_scores)
         tqdm_generator = tqdm(val_generator, mininterval=30)
         current_loss = 0
-        self.model.eval()
+        self.train_model.eval()
+
         with torch.no_grad():
             for batch_idx, (batch_imgs, batch_labels, image_id) in enumerate(tqdm_generator):
                 batch_imgs = torch.stack(batch_imgs)
                 batch_imgs = batch_imgs.to(self.device).float()
                 batch_boxes = [target['boxes'].to(self.device) for target in batch_labels]
                 batch_labels = [target['labels'].to(self.device) for target in batch_labels]
-                loss, _, _ = self.model(batch_imgs, batch_boxes, batch_labels)
+                loss, _, _ = self.train_model(batch_imgs, batch_boxes, batch_labels)
 
                 loss_value = loss.item()
                 # just slide average
@@ -548,7 +512,7 @@ class ModelManager():
         neptune.log_metric('Validation loss', current_loss)
         
         # validate metric
-        nms_thr = 0.37
+        nms_thr = 0.4
         true_list, pred_boxes, pred_scores = self.predict(val_generator)
         current_metric = competition_metric(true_list, pred_boxes, pred_scores, nms_thr)
         print('\nValidation mAP', current_metric)
@@ -559,15 +523,15 @@ class ModelManager():
             print(f'\nLoss has been improved from {self.best_loss} to {current_loss}')
             self.best_loss = current_loss
             self.best_epoch = epoch
-            torch.save(self.model.model.state_dict(), f'{weights_file}_best_loss')
+            torch.save(self.train_model.model.state_dict(), f'{weights_file}')
         else:
             print(f'\nLoss has not been improved from {self.best_loss}')            
 
         if current_metric > self.best_metric:
-            print(f'\nmAP has been improved from {self.best_metric} to {current_metric}')   
-            self.best_metric = current_metric
-            self.best_epoch = epoch
-            torch.save(self.model.model.state_dict(), f'{weights_file}_best_map')
+           print(f'\nmAP has been improved from {self.best_metric} to {current_metric}')   
+           self.best_metric = current_metric
+           self.best_epoch = epoch
+           torch.save(self.train_model.model.state_dict(), f'{weights_file}_best_map')
 
         if epoch - self.best_epoch > overall_patience:
             print('\nEarly stop: training finished with patience!')
@@ -597,25 +561,36 @@ class ModelManager():
 def do_main():
     device = torch.device(f'cuda:{gpu_number}') if torch.cuda.is_available() else torch.device('cpu')
     print(device)
-
     print(len(train_boxes_df))
     print(len(train_images_df))
 
     # Leave only > 0
-    print('Leave only train images with boxes (all)')
+    print('Leave only train images with boxes')
     with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
 
     images_val = train_images_df.loc[
         (train_images_df[fold_column] == fold) & with_boxes_filter, image_id_column].values
     images_train = train_images_df.loc[
-        (train_images_df[fold_column] != fold) & with_boxes_filter, image_id_column].values
-     
-    print(len(images_train), len(images_val))
+        (train_images_df[fold_column] != fold) & with_boxes_filter, image_id_column].values     
+    print(f'\nTrain images:{len(images_train)}, validation images {len(images_val)}')
 
-    train_dataset = WheatDataset(images_train[:16], DIR_TRAIN, train_box_callback,
-                                 transforms=get_train_transform(), is_test=False)
-    valid_dataset = WheatDataset(images_val[:16], DIR_TRAIN, train_box_callback,
-                                 transforms=get_valid_transform(), is_test=True)
+    # get datasets
+    augs_dict = set_augmentations(our_image_size)
+
+    train_dataset = WheatDataset(
+                                image_ids = images_train[:16], 
+                                image_dir = DIR_TRAIN, 
+                                box_callback = train_box_callback,                                
+                                transforms = get_transforms(augs_dict["hard"]), 
+                                is_test = False
+                                )
+    valid_dataset = WheatDataset(
+                                image_ids = images_val[:16], 
+                                image_dir = DIR_TRAIN,                                 
+                                box_callback = train_box_callback,
+                                transforms=get_transforms(augs_dict["resize"]), 
+                                is_test=True
+                                )
 
     train_data_loader = DataLoader(
         train_dataset,
@@ -623,7 +598,7 @@ def do_main():
         shuffle=True,
         num_workers=num_workers,
         collate_fn=collate_fn
-     )
+    )
 
     valid_data_loader = DataLoader(
         valid_dataset,
@@ -636,21 +611,26 @@ def do_main():
     config = get_efficientdet_config(f'tf_efficientdet_d{model_name[-1]}')
     net = EfficientDet(config, pretrained_backbone=False)
     #load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d4-5b370b7a.pth')
-    load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d5-ef44aea8.pth')
+    #load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d5-ef44aea8.pth')
     
     config.num_classes = 1
     config.image_size = our_image_size
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
-    fold_weights_file = f'{experiment_name}.pth'
-    if os.path.exists(fold_weights_file):
-        # continue training
-        print('Continue training, loading weights: ' + fold_weights_file)
-        load_weights(net, fold_weights_file)
+    weights_file = f'{experiment_name}.pth'
+    # continue training
+    if os.path.exists(weights_file):        
+        print(f'Continue training, loading weights from: {weights_file}')
+        load_weights(net, weights_file)
+    else:
+        print(f'Use coco pretrain')
+        pretrain = get_effdet_pretrain_names(model_name)
+        load_weights(net, '../timm-efficientdet-pytorch/{pretrain}')
 
-    model = DetBenchTrain(net, config)
+    model_train = DetBenchTrain(net, config)
+    model_eval = DetBenchEval(net, config)
 
-    manager = ModelManager(model, device)
+    manager = ModelManager(model_train, model_eval, device)
     weights_file = f'{experiment_name}.pth'     
 
     manager.run_train(train_data_loader, valid_data_loader, n_epoches=n_epochs, weights_file=weights_file,
