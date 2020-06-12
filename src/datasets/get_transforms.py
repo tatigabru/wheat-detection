@@ -59,7 +59,9 @@ def set_augmentations(img_size: int = 512):
                 A.Transpose(p=0.2),
                 # Spatial-preserving augmentations
                 A.RandomBrightnessContrast(brightness_by_max=True, p=0.8),
-                A.HueSaturationValue(p=0.7),                                                   
+                A.HueSaturationValue(p=0.7),
+                # cutout
+                A.Cutout(20, 20, 20, p=0.5), 
             ]   
 
     medium_augs = [
@@ -108,7 +110,7 @@ def set_augmentations(img_size: int = 512):
     resize = [A.Resize(height=img_size, width=img_size, p=1.0)]
 
     # Cutout,p=0.5
-    cutout = [A.Cutout(num_holes=8, max_h_size=img_size // 8, max_w_size=img_size // 8, fill_value=0, p=0.5)]
+    cutout = [A.Cutout(num_holes=16, max_h_size=img_size // 16, max_w_size=img_size // 16, fill_value=0, p=0.5)]
 
     # Weather effects                    
     weather = [
@@ -117,6 +119,8 @@ def set_augmentations(img_size: int = 512):
                       A.RandomRain( p=0.2),
                     ], p=0.5),
             ]
+
+    hard_cutout = hard_augs.append(cutout) 
 
     # dictionary of transforms
     transforms_dict = {
@@ -127,6 +131,7 @@ def set_augmentations(img_size: int = 512):
         "resize": resize,   
         "cutout": cutout,  
         "weather": weather,
+        "hard_cutout": hard_augs,
         }
 
     return transforms_dict  
