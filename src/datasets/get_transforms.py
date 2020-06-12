@@ -43,9 +43,9 @@ def set_augmentations(img_size: int = 512):
     hard_augs = [ 
                 A.RandomResizedCrop(height=img_size, width=img_size, scale=(0.5, 1.5), ratio=(0.75, 1.25), p=0.5),            
                 #A.RandomSizedCrop(min_max_height=(512, 1024), height=img_size, width=img_size, p=0.5),
-                A.Resize(height=img_size width=img_size, p=1.0),
+                A.Resize(height=img_size, width=img_size, p=1.0),
                 # Add occasion blur
-                A.OneOf([A.GaussianBlur(), MotionBlur()]),
+                A.OneOf([A.GaussianBlur(), A.MotionBlur()]),
                 A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5), 
                 # noise                
                 A.OneOf([
@@ -64,7 +64,7 @@ def set_augmentations(img_size: int = 512):
 
     medium_augs = [
             A.RandomSizedCrop(min_max_height=(512, 1024), height=img_size, width=img_size, p=0.5),
-            A.Resize(height=img_size width=img_size, p=1.0),
+            A.Resize(height=img_size, width=img_size, p=1.0),
             A.OneOf([
                     A.HueSaturationValue(p=0.9),
                     A.RandomBrightnessContrast(p=0.9),
@@ -105,10 +105,10 @@ def set_augmentations(img_size: int = 512):
             A.Transpose(p=0.5),                        
             ]
 
-    resize = A.Resize(height=img_size, width=img_size, p=1.0)
+    resize = [A.Resize(height=img_size, width=img_size, p=1.0)]
 
     # Cutout,p=0.5
-    cutout = A.Cutout(num_holes=8, max_h_size=img_size // 8, max_w_size=img_size // 8, fill_value=0, p=0.5)
+    cutout = [A.Cutout(num_holes=8, max_h_size=img_size // 8, max_w_size=img_size // 8, fill_value=0, p=0.5)]
 
     # Weather effects                    
     weather = [

@@ -41,9 +41,10 @@ print(neptune.__version__)
 
 neptune.init('ods/wheat')
 
-DATA_DIR = '../Data'
+DATA_DIR = '../../data'
 DIR_TRAIN = f'{DATA_DIR}/train'
 DIR_TEST = f'{DATA_DIR}/test'
+
 fold_column = 'fold'
 fold = 1
 image_id_column = 'image_id'
@@ -58,11 +59,13 @@ min_lr=1e-6
 lr_patience=2
 overall_patience=10 
 loss_delta=1e-4
-gpu_number=1
+gpu_number=0
 
 model_name = 'effdet4'
-experiment_name = f'{model_name}_fold{fold}_{our_image_size}'
-experiment_tag = 'v1'
+experiment_tag = 'medium'
+experiment_name = f'{model_name}_fold{fold}_{our_image_size}_{experiment_tag}'
+checkpoints_dir = f'../checkpoints/{model_name}'
+os.makedirs(checkpoints_dir, exist_ok=True)
 
 # Define parameters
 PARAMS = {'fold' : fold,
@@ -75,16 +78,17 @@ PARAMS = {'fold' : fold,
           'min_lr': min_lr, 
           'lr_patience': lr_patience, 
           'overall_patience': overall_patience, 
-          'loss_delta': loss_delta,          
+          'loss_delta': loss_delta,
+          'augs': 'medium'
          }
 
 # Create experiment with defined parameters
 neptune.create_experiment (name=model_name,
                           params=PARAMS, 
-                          tags=[experiment_name, experiment_tag],
-                          upload_source_files=['train_effdet_val-fix.py'])    
+                          tags=[experiment_name, experiment_tag, f'fold_{fold}'],
+                          upload_source_files=['train_effdet_val2.py', 'src/datasets/get_transforms.py'])    
 
-neptune.append_tags(f'fold_{fold}')
+neptune.append_tags(['augs_medium','no_cutout'])
 
 train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'fixed_train.csv'))
 train_images_df = pd.read_csv(os.path.join(DATA_DIR,'orig_alex_folds.csv'))
@@ -362,9 +366,9 @@ def competition_metric(true_boxes, pred_boxes, pred_scores, score_thr):
                 ntps = ntps + 1  # track number of true positive cases, for curiosity
     overall_maps = overall_maps / (ns + 1e-7)
     print("\nSamples:  ", ns)
-    print("\nFalse positive cases:  ", nfps)
-    print("\nTrue positive cases: ", ntps)
-    print("\nOverall evaluation score: ", overall_maps)
+    print(" False positive cases:  ", nfps)
+    print(" True positive cases: ", ntps)
+    print(" Overall evaluation score: ", overall_maps)
 
     return overall_maps
 
@@ -577,14 +581,14 @@ def do_main():
     augs_dict = set_augmentations(our_image_size)
 
     train_dataset = WheatDataset(
-                                image_ids = images_train[:16], 
+                                image_ids = images_train, 
                                 image_dir = DIR_TRAIN, 
                                 box_callback = train_box_callback,                                
-                                transforms = get_transforms(augs_dict["hard"]), 
+                                transforms = get_transforms(augs_dict["medium"]), 
                                 is_test = False
                                 )
     valid_dataset = WheatDataset(
-                                image_ids = images_val[:16], 
+                                image_ids = images_val, 
                                 image_dir = DIR_TRAIN,                                 
                                 box_callback = train_box_callback,
                                 transforms=get_transforms(augs_dict["resize"]), 
@@ -609,28 +613,28 @@ def do_main():
 
     config = get_efficientdet_config(f'tf_efficientdet_d{model_name[-1]}')
     net = EfficientDet(config, pretrained_backbone=False)
-    #load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d4-5b370b7a.pth')
+    load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d4-5b370b7a.pth')
     #load_weights(net, '../timm-efficientdet-pytorch/efficientdet_d5-ef44aea8.pth')
     
     config.num_classes = 1
     config.image_size = our_image_size
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
-    weights_file = f'{experiment_name}.pth'
+    weights_file = f'{checkpoints_dir}/{experiment_name}.pth'
     # continue training
-    if os.path.exists(weights_file):        
-        print(f'Continue training, loading weights from: {weights_file}')
-        load_weights(net, weights_file)
-    else:
-        print(f'Use coco pretrain')
-        pretrain = get_effdet_pretrain_names(model_name)
-        load_weights(net, '../timm-efficientdet-pytorch/{pretrain}')
+    #if os.path.exists(weights_file):        
+    #    print(f'Continue training, loading weights from: {weights_file}')
+    #    load_weights(net, weights_file)
+    #else:
+    #    print(f'Use coco pretrain')
+    #    pretrain = get_effdet_pretrain_names(model_name)
+    #    load_weights(net, f'../timm-efficientdet-pytorch/{pretrain}')
 
     model_train = DetBenchTrain(net, config)
     model_eval = DetBenchEval(net, config)
 
     manager = ModelManager(model_train, model_eval, device)
-    weights_file = f'{experiment_name}.pth'     
+    weights_file = f'{checkpoints_dir}/{experiment_name}.pth'     
 
     manager.run_train(train_data_loader, valid_data_loader, n_epoches=n_epochs, weights_file=weights_file,
                       factor=factor, start_lr=start_lr, min_lr=min_lr, lr_patience=lr_patience, overall_patience=overall_patience, loss_delta=loss_delta)
