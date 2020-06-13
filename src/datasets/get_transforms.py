@@ -41,11 +41,11 @@ class TransformsCfgs():
 def set_augmentations(img_size: int = 512):   
 
     hard_augs = [ 
-                A.RandomResizedCrop(height=img_size, width=img_size, scale=(0.5, 1.5), ratio=(0.75, 1.25), p=0.5),            
+                A.RandomResizedCrop(height=img_size, width=img_size, scale=(0.5, 1.5), ratio=(0.75, 1.25), p=1),            
                 #A.RandomSizedCrop(min_max_height=(512, 1024), height=img_size, width=img_size, p=0.5),
                 A.Resize(height=img_size, width=img_size, p=1.0),
                 # Add occasion blur
-                A.OneOf([A.GaussianBlur(), A.MotionBlur()]),
+                A.OneOf([A.GaussianBlur(), A.MotionBlur()], p=0.5),
                 A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5), 
                 # noise                
                 A.OneOf([
@@ -61,7 +61,7 @@ def set_augmentations(img_size: int = 512):
                 A.RandomBrightnessContrast(brightness_by_max=True, p=0.8),
                 A.HueSaturationValue(p=0.7),
                 # cutout
-                A.Cutout(20, 20, 20, p=0.5), 
+                #A.Cutout(50, 26, 26, p=0.5), 
             ]   
 
     medium_augs = [

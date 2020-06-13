@@ -59,10 +59,10 @@ min_lr=1e-6
 lr_patience=2
 overall_patience=10 
 loss_delta=1e-4
-gpu_number=1
+gpu_number=0
 
 model_name = 'effdet4'
-experiment_tag = 'light'
+experiment_tag = 'd4'
 experiment_name = f'{model_name}_fold{fold}_{our_image_size}_{experiment_tag}'
 checkpoints_dir = f'../checkpoints/{model_name}'
 os.makedirs(checkpoints_dir, exist_ok=True)
@@ -79,7 +79,7 @@ PARAMS = {'fold' : fold,
           'lr_patience': lr_patience, 
           'overall_patience': overall_patience, 
           'loss_delta': loss_delta,
-          'augs': 'light'
+          'augs': 'd4'
          }
 
 # Create experiment with defined parameters
@@ -88,7 +88,7 @@ neptune.create_experiment (name=model_name,
                           tags=[experiment_name, experiment_tag, f'fold_{fold}'],
                           upload_source_files=['train_effdet_val2.py', 'src/datasets/get_transforms.py'])    
 
-neptune.append_tags(['augs_light','no_cutout'])
+neptune.append_tags(['augs_d4'])
 
 train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'fixed_train.csv'))
 train_images_df = pd.read_csv(os.path.join(DATA_DIR,'orig_alex_folds.csv'))
@@ -584,7 +584,7 @@ def do_main():
                                 image_ids = images_train, 
                                 image_dir = DIR_TRAIN, 
                                 box_callback = train_box_callback,                                
-                                transforms = get_transforms(augs_dict["light"]), 
+                                transforms = get_transforms(augs_dict["d4"]), 
                                 is_test = False
                                 )
     valid_dataset = WheatDataset(
