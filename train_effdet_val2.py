@@ -431,7 +431,7 @@ class ModelManager():
         pred_scores = []
 
         # sorry, now just hardcoded :(
-        original_image_size = our_image_size # not 1024 as we resize train and val the same way
+        original_image_size = 1024 # not 1024 as we resize train and val the same way
 
         with torch.no_grad():
             for batch_idx, (imgs, true_targets, _) in enumerate(tqdm_generator):
@@ -584,7 +584,7 @@ def do_main():
                                 image_ids = images_train, 
                                 image_dir = DIR_TRAIN, 
                                 box_callback = train_box_callback,                                
-                                transforms = get_transforms(augs_dict["d4"]), 
+                                transforms = get_transforms(augs_dict["hard"]), 
                                 is_test = False
                                 )
     valid_dataset = WheatDataset(
@@ -620,7 +620,7 @@ def do_main():
     config.image_size = our_image_size
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
-    weights_file = f'{checkpoints_dir}/{experiment_name}.pth'
+    weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
     # continue training
     #if os.path.exists(weights_file):        
     #    print(f'Continue training, loading weights from: {weights_file}')
@@ -634,7 +634,7 @@ def do_main():
     model_eval = DetBenchEval(net, config)
 
     manager = ModelManager(model_train, model_eval, device)
-    weights_file = f'{checkpoints_dir}/{experiment_name}.pth'     
+    weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'     
 
     manager.run_train(train_data_loader, valid_data_loader, n_epoches=n_epochs, weights_file=weights_file,
                       factor=factor, start_lr=start_lr, min_lr=min_lr, lr_patience=lr_patience, overall_patience=overall_patience, loss_delta=loss_delta)
