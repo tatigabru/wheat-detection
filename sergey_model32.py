@@ -64,14 +64,14 @@ inf_batch_size = 16
 effective_train_batch_size = 4
 grad_accum = effective_train_batch_size // train_batch_size
 our_image_size = 512
-n_epochs = 50
+n_epochs = 60
 factor = 0.2
 start_lr = 1e-3
 min_lr = 1e-6
 lr_patience = 2
 overall_patience = 10
 loss_delta = 1e-4
-gpu_number = 0
+gpu_number = 1
 
 model_name = 'effdet5'
 experiment_tag = 'hard_bs4'
@@ -93,7 +93,8 @@ PARAMS = {'fold' : fold,
           'lr_patience': lr_patience, 
           'overall_patience': overall_patience, 
           'loss_delta': loss_delta, 
-          'experiment_tag': experiment_tag,             
+          'experiment_tag': experiment_tag, 
+          'checkpoints_dir': checkpoints_dir,            
          }
 
 train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'fixed_train.csv'))
@@ -708,14 +709,14 @@ def do_main():
 
     # get datasets
     train_dataset = WheatDataset(
-        image_ids = images_train[:32], 
+        image_ids = images_train, 
         image_dir = DIR_TRAIN, 
         boxes_df = train_boxes_df,
         transforms=get_train_transform(our_image_size), 
         is_test=False
     )
     valid_dataset = WheatDataset(
-        image_ids = images_val[:32], 
+        image_ids = images_val, 
         image_dir = DIR_TRAIN,    
         boxes_df = train_boxes_df,
         transforms=get_valid_transform(our_image_size), 
@@ -739,11 +740,10 @@ def do_main():
         collate_fn=collate_fn
     )
 
-    #pretrain_weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
-    #weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
     weights_file = f'../checkpoints/{model_name}/{experiment_name}.pth'
-    #if os.path.exists(pretrain_weights_file):
-        # continue training
+
+    #pretrain_weights_file = f'{checkpoints_dir}/{experiment_name}.pth'    
+    #if os.path.exists(pretrain_weights_file):        
     #    print(f'Continue training, loading weights from {pretrain_weights_file}')
     #    load_weights(net, pretrain_weights_file)
 
