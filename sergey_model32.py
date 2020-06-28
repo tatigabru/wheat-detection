@@ -739,13 +739,13 @@ def do_main():
         collate_fn=collate_fn
     )
 
-    pretrained_weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
-    weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
-    #weights_file = f'{experiment_name}.pth'
-    if os.path.exists(pretrained_weights_file):
+    #pretrain_weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
+    #weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
+    weights_file = f'../checkpoints/{model_name}/{experiment_name}.pth'
+    #if os.path.exists(pretrain_weights_file):
         # continue training
-        print(f'Continue training, loading weights from {pretrained_weights_file}')
-        load_weights(net, pretrained_weights_file)
+    #    print(f'Continue training, loading weights from {pretrain_weights_file}')
+    #    load_weights(net, pretrain_weights_file)
 
     manager.run_train(
         train_generator = train_data_loader, 
