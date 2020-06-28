@@ -71,10 +71,10 @@ min_lr = 1e-6
 lr_patience = 2
 overall_patience = 10
 loss_delta = 1e-4
-gpu_number = 1
+gpu_number = 0
 
 model_name = 'effdet5'
-experiment_tag = 'hard_bs4'
+experiment_tag = 'hard_rot_bs4'
 experiment_name = f'{model_name}_fold{fold}_{our_image_size}_{experiment_tag}'
 checkpoints_dir = f'../checkpoints/{model_name}'
 os.makedirs(checkpoints_dir, exist_ok=True)
@@ -305,7 +305,7 @@ def get_train_transform(image_size = our_image_size):
             A.Resize(height=image_size, width=image_size, p=1.0),
             # Add occasion blur
             A.OneOf([A.GaussianBlur(), A.MotionBlur()], p=0.5),
-            #A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=0, p = 0.5), 
+            A.Rotate(rotate_limit=90, border_mode=cv2.BORDER_CONSTANT, value=0, p = 0.5), 
             # noise                
             A.OneOf([
                     A.GaussNoise(p=0.5),                 
