@@ -686,13 +686,10 @@ def do_main():
     config.num_classes = 1
     config.image_size = our_image_size
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
-
     model_train = DetBenchTrain(net, config)
     model_eval = DetBenchEval(net, config)
 
     manager = ModelManager(model_train, model_eval, device)
-
-    pretrained_weights_file = 'pretrained.pth'
 
     images_val = train_images_df.loc[
         (train_images_df[fold_column] == fold) & with_boxes_filter, image_id_column].values
@@ -740,11 +737,12 @@ def do_main():
         collate_fn=collate_fn
     )
 
+    pretrained_weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
     weights_file = f'{checkpoints_dir}/{experiment_name}/{experiment_name}.pth'
     #weights_file = f'{experiment_name}.pth'
     if os.path.exists(pretrained_weights_file):
         # continue training
-        print('Continue training, loading weights: ' + pretrained_weights_file)
+        print(f'Continue training, loading weights from {pretrained_weights_file}')
         load_weights(net, pretrained_weights_file)
 
     manager.run_train(
