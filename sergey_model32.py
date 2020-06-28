@@ -61,20 +61,20 @@ spike_dataset_prefix = 'SPIKE_'
 num_workers = 2
 train_batch_size = 4
 inf_batch_size = 16
-effective_train_batch_size = 16
+effective_train_batch_size = 4
 grad_accum = effective_train_batch_size // train_batch_size
 our_image_size = 512
 n_epochs = 50
-factor = 0.5
-start_lr = 2e-4
+factor = 0.2
+start_lr = 1e-3
 min_lr = 1e-6
-lr_patience = 1
+lr_patience = 2
 overall_patience = 10
 loss_delta = 1e-4
 gpu_number = 0
 
 model_name = 'effdet5'
-experiment_tag = 'hard'
+experiment_tag = 'hard_bs4'
 experiment_name = f'{model_name}_fold{fold}_{our_image_size}_{experiment_tag}'
 
 # Define parameters
@@ -472,6 +472,7 @@ class ModelManager():
                 current_loss_mean, get_lr(optimizer)), refresh=False)
         return current_loss_mean
 
+
     def train_on_batch(self, optimizer, batch_imgs, batch_labels, batch_idx):
         batch_imgs = torch.stack(batch_imgs)
         batch_imgs = batch_imgs.to(self.device).float()
@@ -496,6 +497,7 @@ class ModelManager():
             optimizer.zero_grad()    
      
         return loss.item() * grad_accum
+
 
     def predict(self, generator):
         self.eval_model.eval()
