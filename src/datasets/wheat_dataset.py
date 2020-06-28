@@ -1,29 +1,27 @@
 import os
 import random
-
+import re
+import sys
+import warnings
 import albumentations as A
 import cv2
 import numpy as np
 import pandas as pd
 import torch
+import torch.optim as optim
+import torchvision
 from albumentations.pytorch.transforms import ToTensor, ToTensorV2
-from torch.utils.data import Dataset
-from torchvision import transforms
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
 
 
 class WheatDataset(Dataset):
-    def __init__(self, 
-                image_ids: list, 
-                image_dir: str, 
-                boxes_df: pd.DataFrame, 
-                transforms: A.Compose, 
-                is_test: bool
-                ):
+    def __init__(self, image_ids, image_dir, box_callback, transforms, is_test):
         super().__init__()
 
         self.image_ids = image_ids
         self.image_dir = image_dir
-        self.labels_df = boxes_df
+        self.box_callback = box_callback
         self.transforms = transforms
         self.is_test = is_test
 
@@ -38,6 +36,14 @@ class WheatDataset(Dataset):
             image, boxes = self.load_cutmix_image_and_boxes(index)
             assert len(boxes) > 0
 
+        if self.is_test:
+            original_boxes = np.array(boxes, copy=True, dtype=int)
+            # back to coco format
+            original_boxes[:, 2] = original_boxes[:, 2] - original_boxes[:, 0]
+            original_boxes[:, 3] = original_boxes[:, 3] - original_boxes[:, 1]
+        else:
+            # doesn't matter
+            original_boxes = []
         n_boxes = len(boxes)
         class_id = 1
 
@@ -56,12 +62,12 @@ class WheatDataset(Dataset):
                     image = sample['image']
                     boxes = np.zeros((0, 4), dtype=int)
                 else:
-                   if len(sample['bboxes']) == 0:
+                    if len(sample['bboxes']) == 0:
                         # try another augmentation
                         #print('try another augmentation')
                         continue
-                   image = sample['image']
-                   boxes = np.array(sample['bboxes'])
+                    image = sample['image']
+                    boxes = np.array(sample['bboxes'])
                 break
             if n_boxes > 0:
                 assert len(boxes) > 0
@@ -71,11 +77,17 @@ class WheatDataset(Dataset):
         boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
         boxes = torch.as_tensor(boxes, dtype=torch.float)
         labels = torch.as_tensor(labels, dtype=torch.float)
-        
+        #if n_boxes == 0:
+        #   labels = torch.LongTensor([])
+
+        #print('boxes', repr(boxes))
+        #print('labels', repr(labels))
+
         target = {}
         target['boxes'] = boxes
         target['labels'] = labels
         target['image_id'] = torch.tensor([index])
+        target['original_boxes'] = original_boxes
 
         return transforms.ToTensor()(image), target, self.image_ids[index]
 
@@ -84,9 +96,7 @@ class WheatDataset(Dataset):
 
     def load_image_and_boxes(self, index):
         image_id = self.image_ids[index]
-        records = self.labels_df[self.labels_df['image_id'] == image_id]
-        boxes = records[['x', 'y', 'w', 'h']].values
-        #boxes = self.box_callback(image_id)
+        boxes = self.box_callback(image_id)
 
         image = cv2.imread(f'{self.image_dir}/{image_id}.jpg', cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -142,5 +152,5 @@ class WheatDataset(Dataset):
         result_boxes = result_boxes.astype(np.int32)
         result_boxes = result_boxes[
             np.where((result_boxes[:, 2] - result_boxes[:, 0]) * (result_boxes[:, 3] - result_boxes[:, 1]) > 0)]
-            
+
         return result_image, result_boxes
