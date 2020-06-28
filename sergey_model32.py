@@ -76,6 +76,8 @@ gpu_number = 0
 model_name = 'effdet5'
 experiment_tag = 'hard_bs4'
 experiment_name = f'{model_name}_fold{fold}_{our_image_size}_{experiment_tag}'
+checkpoints_dir = f'../checkpoints/{model_name}'
+os.makedirs(checkpoints_dir, exist_ok=True)
 
 # Define parameters
 PARAMS = {'fold' : fold,

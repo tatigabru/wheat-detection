@@ -23,7 +23,7 @@ class WheatDataset(Dataset):
 
         self.image_ids = image_ids
         self.image_dir = image_dir
-        self.labels_df = boxes_df
+        self.boxes_df = boxes_df
         self.transforms = transforms
         self.is_test = is_test
 
