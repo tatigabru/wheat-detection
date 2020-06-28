@@ -305,7 +305,7 @@ def get_train_transform(image_size = our_image_size):
             A.Resize(height=image_size, width=image_size, p=1.0),
             # Add occasion blur
             A.OneOf([A.GaussianBlur(), A.MotionBlur()], p=0.5),
-            A.Rotate(rotate_limit=90, border_mode=cv2.BORDER_CONSTANT, value=0, p = 0.5), 
+            A.Rotate(limit=90, border_mode=cv2.BORDER_CONSTANT, value=0, p = 0.5), 
             # noise                
             A.OneOf([
                     A.GaussNoise(p=0.5),                 
