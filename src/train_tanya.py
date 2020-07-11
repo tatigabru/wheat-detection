@@ -1,4 +1,4 @@
-import os
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestartimport os
 import random
 #import re
 import sys
