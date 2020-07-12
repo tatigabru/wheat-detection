@@ -8,8 +8,8 @@
 
 
 # train and val datasets (image directory or *.txt file with image paths)
-train: ../../data/convertor/fold0/images/train2017/
-val: ../../data/convertor/fold0/images/val2017/
+train: ../../data/convertor/images/train2017/
+val: ../../data/convertor/images/val2017/
 
 # number of classes
 nc: 1
