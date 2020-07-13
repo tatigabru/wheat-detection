@@ -64,29 +64,28 @@ hyp = {'optimizer': 'adam', # 'SGD',  # ['adam', 'SGD', None] if none, default i
        'n_epochs': 2,      
        }  
 
-fold = 3
-image_size = 512
-model_name = 'yolo5'
-experiment_name = f'{model_name}_fold{fold}_{image_size}'
-experiment_tag = 'v1'
-
-# Create experiment with defined parameters
-neptune.init('ods/wheat')
-neptune.create_experiment (name=experiment_name,
-                          params=hyp, 
-                          tags=[experiment_name, experiment_tag],
-                          upload_source_files=['train_tanya.py'])  
-
 
 def train(hyp):
     print(f'Hyperparameters {hyp}')
     log_dir = '../../runs/yolo5'  # run directory
     wdir = str(Path(log_dir) / 'weights')  # weights directory
-
     os.makedirs(wdir, exist_ok=True)
     last = wdir + 'last.pt'
     best = wdir + 'best.pt'
     results_file = log_dir + os.sep + 'results.txt'
+
+    fold = 0
+    image_size = 224
+    model_name = 'yolo5'
+    experiment_name = f'{model_name}_fold{fold}_{image_size}'
+    experiment_tag = 'v1'
+
+    # Create experiment with defined parameters
+    neptune.init('ods/wheat')
+    neptune.create_experiment (name=experiment_name,
+                          params=hyp, 
+                          tags=[experiment_name, experiment_tag],
+                          upload_source_files=['train_tanya.py'])  
 
     # Save run settings
     with open(Path(log_dir) / 'hyp.yaml', 'w') as f:
@@ -282,13 +281,12 @@ def train(hyp):
             pred = model(imgs)
 
             # Loss
-            print(" BEFORE|targets type: ", targets.type())
-            loss, loss_items = compute_loss(pred, targets.to(device, dtype = torch.float), model) # changed target type to float
-            print(" AFTER|targets type: ", targets.type())
+            #print(" BEFORE|targets type: ", targets.type())
+            loss, loss_items = compute_loss(pred, targets.to(device, dtype = torch.float), model) # changed target type to float            
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
-
+  
             # Backward
             if mixed_precision:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -308,6 +306,10 @@ def train(hyp):
             s = ('%10s' * 2 + '%10.4g' * 6) % (
                 '%g/%g' % (epoch, epochs - 1), mem, *mloss, targets.shape[0], imgs.shape[-1])
             pbar.set_description(s)
+
+            # log loss
+            loss_value = mloss.detach().numpy()
+            neptune.log_metric('\nTrain loss: ', loss_value) 
 
             # Plot
             if ni < 3:
@@ -340,15 +342,13 @@ def train(hyp):
         if len(opt.name) and opt.bucket:
             os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (opt.bucket, opt.name))
 
-        # Tensorboard --> to neptune logging
-        if neptune_writer:    
-            tags = ['train/giou_loss', 'train/obj_loss', 'train/cls_loss',
-                    'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/F1',
-                    'val/giou_loss', 'val/obj_loss', 'val/cls_loss']
-            neptune.append_tags(tags)        
-            for x, tag in zip(list(mloss[:-1]) + list(results), tags):
-                #neptune_writer.add_scalar(tag, x, epoch)
-                neptune.log_metric(tag, x)
+        # Tensorboard --> to neptune logging        
+        tags = ['train/giou_loss', 'train/obj_loss', 'train/cls_loss',
+                'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/F1',
+                'val/giou_loss', 'val/obj_loss', 'val/cls_loss']
+        neptune.append_tags(tags)        
+        for x, tag in zip(list(mloss[:-1]) + list(results), tags):
+            neptune.log_metric(tag, x)
 
         # Update best mAP
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]

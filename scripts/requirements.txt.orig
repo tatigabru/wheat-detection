@@ -12,7 +12,7 @@ scikit-learn>=0.19.2
 tqdm>=4.25.0 
 ensemble-boxes
 #git clone https://github.com/ultralytics/yolov5
-
+tensorboard == 1.14.0
 pylint >= 2.5.3
 mypy >= 0.782
 flake8 >= 3.8.3
