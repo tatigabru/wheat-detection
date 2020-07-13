@@ -282,7 +282,9 @@ def train(hyp):
             pred = model(imgs)
 
             # Loss
-            loss, loss_items = compute_loss(pred, targets.to(device), model)
+            print(" BEFORE|targets type: ", targets.type())
+            loss, loss_items = compute_loss(pred, targets.to(device, dtype = torch.float), model) # changed target type to float
+            print(" AFTER|targets type: ", targets.type())
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results

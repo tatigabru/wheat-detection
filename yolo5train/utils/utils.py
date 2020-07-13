@@ -534,7 +534,7 @@ def build_targets(p, targets, model):
         b, c = t[:, :2].long().T  # image, class
         gxy = t[:, 2:4]  # grid xy
         gwh = t[:, 4:6]  # grid wh
-        gij = (gxy - offsets).long()
+        gij = (gxy - offsets).float() #long()
         gi, gj = gij.T  # grid xy indices
 
         # Append
