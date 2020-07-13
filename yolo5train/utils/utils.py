@@ -531,10 +531,10 @@ def build_targets(p, targets, model):
                 offsets = torch.cat((z, z[j] + off[0], z[k] + off[1], z[l] + off[2], z[m] + off[3]), 0) * g
 
         # Define
-        b, c = t[:, :2].long().T  # image, class
+        b, c = t[:, :2].float().T # <-- changed to float() long().T  # image, class
         gxy = t[:, 2:4]  # grid xy
         gwh = t[:, 4:6]  # grid wh
-        gij = (gxy - offsets).float() #long()
+        gij = (gxy - offsets).float() # <-- changed to float() long()
         gi, gj = gij.T  # grid xy indices
 
         # Append
