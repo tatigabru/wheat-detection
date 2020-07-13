@@ -70,17 +70,17 @@ experiment_name = f'{model_name}_fold{fold}_{image_size}'
 experiment_tag = 'v1'
 
 # Create experiment with defined parameters
-#neptune.init('ods/wheat')
-#neptune.create_experiment (name=experiment_name,
-#                          params=hyp, 
-#                          tags=[experiment_name, experiment_tag],
-#                          upload_source_files=['train_tanya.py'])  
+neptune.init('ods/wheat')
+neptune.create_experiment (name=experiment_name,
+                          params=hyp, 
+                          tags=[experiment_name, experiment_tag],
+                          upload_source_files=['train_tanya.py'])  
 
 
 def train(hyp):
     print(f'Hyperparameters {hyp}')
-    log_dir = '../../runs/evolution'  # run directory
-    wdir = str(Path(log_dir) / 'weights') + os.sep  # weights directory
+    log_dir = '../../runs/yolo5'  # run directory
+    wdir = str(Path(log_dir) / 'weights')  # weights directory
 
     os.makedirs(wdir, exist_ok=True)
     last = wdir + 'last.pt'
@@ -220,8 +220,8 @@ def train(hyp):
     # cf = torch.bincount(c.long(), minlength=nc) + 1.
     # model._initialize_biases(cf.to(device))
     plot_labels(labels, save_dir=log_dir)
-    if tb_writer:
-        tb_writer.add_histogram('classes', c, 0)
+    if neptune_writer:
+        neptune_writer.add_histogram('classes', c, 0)
 
     # Check anchors
     if not opt.noautoanchor:
@@ -312,10 +312,9 @@ def train(hyp):
             if ni < 3:
                 f = str(Path(log_dir) / ('train_batch%g.jpg' % ni))  # filename
                 result = plot_images(images=imgs, targets=targets, paths=paths, fname=f)
-                if tb_writer and result is not None:
-                    tb_writer.add_image(f, result, dataformats='HWC', global_step=epoch)
-                    # tb_writer.add_graph(model, imgs)  # add model to tensorboard
-
+                #if neptune_writer and result is not None:
+                    #neptune.log_artifact('model_weights.pkl')
+                    
             # end batch ------------------------------------------------------------------------------------------------
 
         # Scheduler
@@ -340,13 +339,15 @@ def train(hyp):
         if len(opt.name) and opt.bucket:
             os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (opt.bucket, opt.name))
 
-        # Tensorboard
-        if tb_writer:
+        # Tensorboard --> to neptune logging
+        if neptune_writer:    
             tags = ['train/giou_loss', 'train/obj_loss', 'train/cls_loss',
                     'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/F1',
                     'val/giou_loss', 'val/obj_loss', 'val/cls_loss']
+            neptune.append_tags(tags)        
             for x, tag in zip(list(mloss[:-1]) + list(results), tags):
-                tb_writer.add_scalar(tag, x, epoch)
+                #neptune_writer.add_scalar(tag, x, epoch)
+                neptune.log_metric(tag, x)
 
         # Update best mAP
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
@@ -434,13 +435,13 @@ if __name__ == '__main__':
 
     # Train
     if not opt.evolve:
-        tb_writer = SummaryWriter(log_dir=increment_dir('runs/exp', opt.name))
-        print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
+        #neptune_writer = SummaryWriter(log_dir=increment_dir('runs/exp', opt.name))
+        #print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
         train(hyp)
 
     # Evolve hyperparameters (optional)
     else:
-        tb_writer = None
+        neptune_writer = None
         opt.notest, opt.nosave = True, True  # only test/save final epoch
         if opt.bucket:
             os.system('gsutil cp gs://%s/evolve.txt .' % opt.bucket)  # download evolve.txt if exists
