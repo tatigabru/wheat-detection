@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 import neptune
 import test  # import test.py to get mAP after each epoch
 from models.yolo import Model
@@ -14,12 +14,13 @@ from utils import google_utils
 from utils.datasets import *
 from utils.utils import *
 
-mixed_precision = True
-try:  # Mixed precision training https://github.com/NVIDIA/apex
-    from apex import amp
-except:
-    print('Apex recommended for faster mixed precision training: https://github.com/NVIDIA/apex')
-    mixed_precision = False  # not installed
+mixed_precision = False
+if mixed_precision:
+    try:  # Mixed precision training https://github.com/NVIDIA/apex
+        from apex import amp
+    except:
+        print('Apex recommended for faster mixed precision training: https://github.com/NVIDIA/apex')
+        mixed_precision = False  # not installed
 
 print(torch.__version__)
 print(neptune.__version__)
@@ -37,7 +38,7 @@ seed_everything(SEED)
 
 
 # Hyperparameters
-hyp = {'optimizer': 'SGD',  # ['adam', 'SGD', None] if none, default is SGD
+hyp = {'optimizer': 'adam', # 'SGD',  # ['adam', 'SGD', None] if none, default is SGD
        'lr0': 0.01,  # initial learning rate (SGD=1E-2, Adam=1E-3)
        'momentum': 0.937,  # SGD momentum/Adam beta1
        'weight_decay': 5e-4,  # optimizer weight decay
@@ -220,8 +221,6 @@ def train(hyp):
     # cf = torch.bincount(c.long(), minlength=nc) + 1.
     # model._initialize_biases(cf.to(device))
     plot_labels(labels, save_dir=log_dir)
-    if neptune_writer:
-        neptune_writer.add_histogram('classes', c, 0)
 
     # Check anchors
     if not opt.noautoanchor:
@@ -436,7 +435,6 @@ if __name__ == '__main__':
     # Train
     if not opt.evolve:
         #neptune_writer = SummaryWriter(log_dir=increment_dir('runs/exp', opt.name))
-        #print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
         train(hyp)
 
     # Evolve hyperparameters (optional)
