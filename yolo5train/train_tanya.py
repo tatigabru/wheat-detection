@@ -308,8 +308,8 @@ def train(hyp):
             pbar.set_description(s)
 
             # log loss
-            loss_value = mloss.detach().numpy()
-            neptune.log_metric('\nTrain loss: ', loss_value) 
+            #loss_value = mloss.detach().numpy().mean()
+            #neptune.log_metric('\nTrain loss: ', loss_value) 
 
             # Plot
             if ni < 3:
