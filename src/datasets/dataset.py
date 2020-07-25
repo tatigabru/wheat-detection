@@ -209,6 +209,3 @@ def load_image_boxes(image_id, labels: pd.DataFrame, format: str = 'pascal_voc')
 
     return image, boxes
 
-
-def test_dataset():
-
