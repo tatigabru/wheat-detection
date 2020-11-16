@@ -17,10 +17,14 @@ stop:
 clean:
 	docker-compose down --volumes
 
+# download and unpack dataset
+dataset:
+	docker exec wheat-dev bash scripts/download_dataset.sh
+
 # Run trainingd of EfficientDet 4 
 train:
-	docker exec wheat-dev bash scripts/stage4.sh
+	docker exec wheat-dev bash scripts/train.sh
 
 # Make prediction for test data (trained models in models/ directory)
 inference:
-	docker exec wheat-dev bash scripts/stage4.sh
+	docker exec wheat-dev bash scripts/predict.sh

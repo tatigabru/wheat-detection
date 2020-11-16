@@ -4,7 +4,9 @@ This is the code for ["Wheat Detection Challenge"](https://www.kaggle.com/c/glob
 
 The solution is based on EfficientDet detectors, augmentation, [weighted box fusion](https://github.com/ZFTurbo/Weighted-Boxes-Fusion) and pseudolabling. Below you will find description of full pipeline and instructions how to run training, inference on competitions data or inference on your own data.
 
-The solution have been packed using Docker or package to simplify environment preparation.
+The solution have been packed using Docker to simplify environment preparation.
+
+You can also install code as a package.
 
 ## Table of content
 
@@ -13,9 +15,9 @@ The solution have been packed using Docker or package to simplify environment pr
     - [Hardware](#hardware)
 - [Models](#models)
 - [Training](#training)
-    -[Prepare environment](#prepare-environment)
-    -[Dataset](#dataset)
-    -[Make folds](#make-folds)
+    - [Prepare environment](#prepare-environment)
+    - [Dataset](#dataset)
+    - [Make folds](#make-folds)
 - [Inference](#inference)    
 
 ## Requirements
@@ -73,13 +75,12 @@ The script for dowloading is in `scripts/download_dataset.sh`.
 You need to have kaggle account, create directory .kaggle and copy kaggle.json in it to access the data.
 
 ```bash
-$ make data
+$ make dataset
 ```
 
 #### Make folds
 python -m src.folds.make_folds
 
-<<<<<<< HEAD
 #### Images preprocessing and augmentations
 
 The original tiles were scaled to 512x512 px and split location-wise, as in notebooks/. 
@@ -101,7 +102,6 @@ $ make train
 #### Get models weigths 
 
  - Unpack the model weights to `models/` directory
-
 
 
 **Start inference** (`models/` directory should be provided with pretrained models)
@@ -132,12 +132,6 @@ $ make stop
 ```
 
 Bring everything down, removing the container entirely
-=======
-## Run train 
-
-## Inference
-
->>>>>>> 303ab158c9d0c48e8e46a4fb68b6a83cf73cffb2
 
 ```bash
 $ make clean
