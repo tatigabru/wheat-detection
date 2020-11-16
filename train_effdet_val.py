@@ -198,8 +198,6 @@ class WheatDataset(Dataset):
             if n_boxes > 0:
                 assert len(boxes) > 0
 
-        # to tensors
-        # https://github.com/rwightman/efficientdet-pytorch/blob/814bb96c90a616a20424d928b201969578047b4d/data/dataset.py#L77
         boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
         boxes = torch.as_tensor(boxes, dtype=torch.float)
         labels = torch.as_tensor(labels, dtype=torch.float)

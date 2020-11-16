@@ -158,5 +158,3 @@ def get_valid_transforms(img_size: int = 512) -> A.Compose:
     return A.Compose([
         A.Resize(height=img_size, width=img_size, p=1)
     ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
-
-

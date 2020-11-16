@@ -7,9 +7,9 @@ rm installer.sh
 export PATH="/root/anaconda3/bin:$PATH" && \
 
 conda update -y conda
-conda create -y -n spacenet python=3.7
-conda activate spacenet
+conda create -y -n wheat python=3.7
+conda activate wheat
 
-conda install -y -n spacenet pytorch=0.4.1 cuda90 -c pytorch
+conda install -y -n wheat pytorch=0.4.1 cuda90 -c pytorch
 pip install --upgrade pip
 pip install -r requirements.txt
