@@ -79,6 +79,7 @@ $ make data
 #### Make folds
 python -m src.folds.make_folds
 
+<<<<<<< HEAD
 #### Images preprocessing and augmentations
 
 The original tiles were scaled to 512x512 px and split location-wise, as in notebooks/. 
@@ -131,6 +132,12 @@ $ make stop
 ```
 
 Bring everything down, removing the container entirely
+=======
+## Run train 
+
+## Inference
+
+>>>>>>> 303ab158c9d0c48e8e46a4fb68b6a83cf73cffb2
 
 ```bash
 $ make clean
