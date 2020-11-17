@@ -1,9 +1,9 @@
-version: "2.3"
+version: "0.1"
 
 services:
     dev:
-        container_name: open-cities-dev
-        image: open-cities:0.1
+        container_name: wheat-dev
+        image: wheat:0.1
         volumes:
             - ./:/workspace
             #- /data_rw/competitions/open_cities/:/workspace/old-data/

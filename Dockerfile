@@ -34,8 +34,13 @@ RUN conda update -n base conda && \
     conda install -y python=3.7 && \
     pip install --upgrade pip
 
+# Add netrpute env variable 
+ENV NEPTUNE="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTExN2QzMzQtMDJlYi00ODkzLTk5YTktYWNhNzg4MWFjZGQ3In0="
+RUN echo "export NEPTUNE_API_TOKEN=$NEPTUNE" 
 
-ENV IMAGE_PATH="/wdata/pretrained_models/"
+
+
+ENV IMAGE_PATH="/data/"
 
 # ********************************************************
 # * Anything else you want to do like clean up goes here *
