@@ -3,17 +3,18 @@ from sklearn.model_selection import StratifiedKFold
 import numpy as np
 from .. constants import META_TRAIN
 
+
 def make_folds(train_df: pd.DataFrame) -> pd.DataFrame:
     bboxs = np.stack(train_df['bbox'].apply(lambda x: np.fromstring(x[1:-1], sep=',')))
     for i, column in enumerate(['x', 'y', 'w', 'h']):
-        marking[column] = bboxs[:,i]
-    marking.drop(columns=['bbox'], inplace=True)
+        train_df[column] = bboxs[:,i]
+    train_df.drop(columns=['bbox'], inplace=True)
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-    df_folds = marking[['image_id']].copy()
+    df_folds = train_df[['image_id']].copy()
     df_folds.loc[:, 'bbox_count'] = 1
     df_folds = df_folds.groupby('image_id').count()
-    df_folds.loc[:, 'source'] = marking[['image_id', 'source']].groupby('image_id').min()['source']
+    df_folds.loc[:, 'source'] = train_df[['image_id', 'source']].groupby('image_id').min()['source']
     df_folds.loc[:, 'stratify_group'] = np.char.add(
         df_folds['source'].values.astype(str),
         df_folds['bbox_count'].apply(lambda x: f'_{x // 15}').values.astype(str)
