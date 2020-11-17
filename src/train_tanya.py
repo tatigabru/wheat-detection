@@ -16,7 +16,7 @@ from torch.utils.data.sampler import SequentialSampler
 
 from tqdm import tqdm
 sys.path.append("../../timm-efficientdet-pytorch")
-#sys.path.append("../../omegaconf")
+sys.path.append("../../omegaconf")
 
 import neptune
 from constants import DATA_DIR, META_TRAIN, TRAIN_DIR

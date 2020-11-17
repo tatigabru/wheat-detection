@@ -3,6 +3,7 @@ import random
 import re
 import sys
 import warnings
+os.system("pip install --no-deps 'timm_wheels/timm-0.1.26-py3-none-any.whl' > /dev/null")
 
 import albumentations as A
 import cv2
