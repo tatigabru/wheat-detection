@@ -27,6 +27,7 @@ class ModelRunner():
         self.model = model
         self.device = device
 
+
     def train_epoch(self, optimizer, generator):
         self.model.train()
         tqdm_generator = tqdm(generator, mininterval=30)
@@ -41,6 +42,7 @@ class ModelRunner():
                 current_loss_mean, get_lr(optimizer)))
         return current_loss_mean
 
+
     def train_on_batch(self, optimizer, batch_imgs, batch_labels, batch_idx):
         batch_imgs = torch.stack(batch_imgs)
         batch_imgs = batch_imgs.to(self.device).float()
@@ -53,6 +55,7 @@ class ModelRunner():
         optimizer.step()
         optimizer.zero_grad()
         return loss.item()
+
 
     def predict(self, generator):
         self.model.to(self.device)
@@ -75,6 +78,7 @@ class ModelRunner():
         print(pred_scores)
         #print(pred_boxes)
         return true_list, pred_boxes, pred_scores
+
 
     def run_train(self, train_generator, val_generator, n_epoches, weights_file, factor, start_lr, min_lr,
                   lr_patience, overall_patience, loss_delta=0.):

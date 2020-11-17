@@ -1,4 +1,4 @@
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestartimport os
+import os
 import random
 #import re
 import sys
@@ -16,7 +16,7 @@ from torch.utils.data.sampler import SequentialSampler
 
 from tqdm import tqdm
 sys.path.append("../../timm-efficientdet-pytorch")
-sys.path.append("../../omegaconf")
+#sys.path.append("../../omegaconf")
 
 import neptune
 from constants import DATA_DIR, META_TRAIN, TRAIN_DIR
@@ -69,7 +69,14 @@ PARAMS = {'fold' : fold,
 print(f'parameters: {PARAMS}')
 
 # Create experiment with defined parameters
-neptune.init('ods/wheat')
+neptune.init(project_qualified_name='blonde/wheat',
+            api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTExN2QzMzQtMDJlYi00ODkzLTk5YTktYWNhNzg4MWFjZGQ3In0=',
+            )
+
+#neptune.init(project_qualified_name='shared/onboarding',
+#             api_token='ANONYMOUS',
+#             )
+
 neptune.create_experiment (name=experiment_name,
                           params=PARAMS, 
                           tags=[experiment_name, experiment_tag],
@@ -82,7 +89,7 @@ def main() -> None:
 
     train_boxes_df = pd.read_csv(META_TRAIN)
     train_boxes_df = preprocess_boxes(train_boxes_df)
-    train_images_df = pd.read_csv('orig_alex_folds.csv')    
+    train_images_df = pd.read_csv('folds/orig_alex_folds.csv')    
     print(f'\nTotal images: {len(train_images_df.image_id.unique())}')
     
     # Leave only images with bboxes
@@ -140,7 +147,7 @@ def main() -> None:
     net.class_net = HeadNet(config, num_outputs=config.num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 
     weights_file = f'{experiment_name}.pth'
-    # continue training
+    # If resume training
     if os.path.exists(weights_file):        
         print(f'Continue training, loading weights from: {weights_file}')
         load_weights(net, weights_file)

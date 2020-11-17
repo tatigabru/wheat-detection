@@ -133,7 +133,7 @@ def calculate_precision(gts, preds, threshold = 0.5, form = 'coco', ious=None) -
 
 @jit(nopython=True)
 def calculate_image_precision(gts, preds, thresholds = (0.5, ), form = 'coco') -> float:
-    """Calculates image precision.
+    """Calculate image precision.
 
     Args:
         gts: (List[List[Union[int, float]]]) Coordinates of the available ground-truth boxes
@@ -180,7 +180,6 @@ def calculate_final_score(all_predictions, score_threshold: float, iou_threshold
 
 def plot_result(sample, preds, gt_boxes):
     """Plots preds and ground truth"""
-
     fig, ax = plt.subplots(1, 1, figsize=(16, 8))
     for pred_box in preds:
         cv2.rectangle(
@@ -287,7 +286,7 @@ def convert_to_xyhw_boxes(boxes: list) -> list:
     return [convert_to_xyhw_box(box.astype(np.int32)) for box in boxes]
 
 
-def competition_metric(true_boxes: np.array, pred_boxes: np.array, pred_scores:np.array, score_thr) -> float:
+def competition_metric(true_boxes: np.array, pred_boxes: np.array, pred_scores:np.array, score_thr: float) -> float:
     """
     Mean average precision at differnet intersection over union (IoU) threshold
 
@@ -318,10 +317,12 @@ def competition_metric(true_boxes: np.array, pred_boxes: np.array, pred_scores:n
         score_filter = cur_pred_scores >= score_thr
         cur_image_pred_boxes = cur_image_pred_boxes[score_filter]
         cur_pred_scores = cur_pred_scores[score_filter]
-        if (cur_image_true_boxes.shape[0] == 0 and cur_image_pred_boxes.shape[0] > 0):  # false positive
+        # false positive
+        if (cur_image_true_boxes.shape[0] == 0 and cur_image_pred_boxes.shape[0] > 0):  
             ns = ns + 1  # increment denominator but add nothing to numerator
             nfps = nfps + 1  # track number of false positive cases, for curiosity
-        elif (cur_image_true_boxes.shape[0] > 0):  # actual positive
+        # true positive    
+        elif (cur_image_true_boxes.shape[0] > 0):  
             ns = ns + 1  # increment denominator & add contribution to numerator
             contrib = map_iou(cur_image_true_boxes, cur_image_pred_boxes, cur_pred_scores)
             # print('contrib', contrib)
@@ -338,7 +339,7 @@ def competition_metric(true_boxes: np.array, pred_boxes: np.array, pred_scores:n
 
 
 def find_best_nms_threshold(true_list, pred_boxes, pred_scores, 
-                            min_thres: float = 0.30, max_thres:float = 0.40, point: int =10) -> Tuple[float, float]:
+                            min_thres: float = 0.30, max_thres: float = 0.40, points: int =10) -> Tuple[float, float]:
 
     nms_thresholds = np.linspace(min_thres, max_thres, num=points, endpoint=False)     
     best_metric = 0

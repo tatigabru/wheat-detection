@@ -4,3 +4,4 @@ DATA_DIR = '/kaggle/input/input/global-wheat-detection' if ON_KAGGLE else "../da
 TRAIN_DIR = f'{DATA_DIR}/train'
 META_TRAIN = f'{DATA_DIR}/train.csv'
 TEST_DIR = f'{DATA_DIR}/test'
+FOLDS = 'folds/orig_alex_folds.csv'

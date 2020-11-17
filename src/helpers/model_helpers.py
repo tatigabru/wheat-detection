@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 from typing import Tuple
 import sys 
-sys.path.append("../timm-efficientdet-pytorch")
+#sys.path.append("../timm-efficientdet-pytorch")
 
 import numpy as np
 import torch
@@ -17,7 +17,10 @@ from effdet.efficientdet import HeadNet
 
 
 def set_seed(seed: int=1234) -> None:
-    """Fix all random seeds for reproductibility"""
+    """
+    Fix all random seeds for reproducibility
+    PyTorch
+    """
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
@@ -29,7 +32,7 @@ def set_seed(seed: int=1234) -> None:
 
 def fix_seeds_tf(seed: int=1234) -> None:
     """
-    Fix all random seeds for reproductibility
+    Fix all random seeds for reproducibility
     for Tensorflow
     """
     random.seed(seed)
@@ -120,17 +123,17 @@ def load_weights(model: nn.Module, weights_file: str):
 
 
 def set_train_effdet(config, num_classes: int = 1, device: torch.device = 'cuda:0'):
-    
+    """Init EfficientDet to train mode"""
     model = EfficientDet(config, pretrained_backbone=False)    
     model.class_net = HeadNet(config, num_outputs=num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
-    model = DetBenchTrain(net, config)
+    model = DetBenchTrain(model, config)
     model = model.train()
 
     return model.to_device(device)     
    
 
 def set_eval_effdet(checkpoint_path: str, config, num_classes: int = 1, device: torch.device = 'cuda:0'):
-    
+    """Init EfficientDet to validation mode"""
     net = EfficientDet(config, pretrained_backbone=False)
     net.class_net = HeadNet(config, num_outputs=num_classes, norm_kwargs=dict(eps=.001, momentum=.01))
 

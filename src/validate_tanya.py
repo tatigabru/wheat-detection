@@ -2,8 +2,8 @@ import os
 import random
 import sys
 import warnings
-sys.path.append("../../timm-efficientdet-pytorch")
-sys.path.append("../../omegaconf")
+#sys.path.append("../../timm-efficientdet-pytorch")
+#sys.path.append("../../omegaconf")
 
 
 import albumentations as A

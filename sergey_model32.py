@@ -99,18 +99,14 @@ PARAMS = {'fold' : fold,
 
 train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'fixed_train.csv'))
 print('boxes original: ', len(train_boxes_df))
-#spike_df = pd.read_csv(os.path.join(DATA_DIR, 'spike_train.csv'))
-#train_boxes_df = pd.concat((train_boxes_df, spike_df), axis=0, sort=False)
-#print('boxes after spike: ', len(train_boxes_df))
 
 train_images_df = pd.read_csv(os.path.join(DATA_DIR,'orig_alex_folds.csv'))
-#train_images_df = pd.read_csv(os.path.join(DATA_DIR, 'alex_folds_with_negative.csv'))
 #train_images_df = pd.read_csv(os.path.join(DATA_DIR, 'tanya_folds.csv'))
 
 train_boxes_df = preprocess_boxes(train_boxes_df)
 
 # filter tiny boxes 
-# #train_boxes_df['area'] = train_boxes_df['w'] * train_boxes_df['h']
+#train_boxes_df['area'] = train_boxes_df['w'] * train_boxes_df['h']
 #train_boxes_df = filter_box_size(train_boxes_df, min_size = 10)
 
 

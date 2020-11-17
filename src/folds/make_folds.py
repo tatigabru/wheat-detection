@@ -31,3 +31,4 @@ if __name__=='__main__':
     train_df = pd.read_csv(META_TRAIN)
     df_folds  = make_folds(train_df)
     df_folds.to_csv('folds.csv', index=False) 
+    print('Done')
