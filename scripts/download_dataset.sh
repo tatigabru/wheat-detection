@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
 pip install --upgrade pip
-CUR_DIR=$pwd
-DATA_DIR_LOC='../../data'
 
-mkdir -p $DATA_DIR_LOC
+DATA_DIR_LOC='../../data'
 cd $DATA_DIR_LOC
 
 if [ "$(ls -A $(pwd))" ]
@@ -17,6 +15,4 @@ else
     unzip global-wheat-detection.zip
     rm global-wheat-detection.zip  
 fi
-
-cd $CUR_DIR
 echo $(pwd)
