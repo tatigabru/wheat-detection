@@ -29,10 +29,11 @@ from helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
                                    preprocess_boxes)
 from helpers.metric import competition_metric, find_best_nms_threshold
 from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,
-                                   load_weights)
+                                   load_weights, fix_seed)
 from model_runner import ModelRunner
 
 warnings.filterwarnings('ignore')
+fix_seed(1234)
 
 fold = 3
 num_workers = 2

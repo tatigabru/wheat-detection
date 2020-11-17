@@ -25,24 +25,14 @@ from typing import Optional, List, Tuple
 from src.helpers.boxes_helpers import (filter_box_area, filter_box_size,
                                    preprocess_boxes)
 from src.helpers.metric import competition_metric, find_best_nms_threshold
-from src.helpers.model_helpers import (collate_fn, get_effdet_pretrain_names)
-
-from src.datasets.wheat_dataset import WheatDataset
+from src.helpers.model_helpers import (collate_fn, get_effdet_pretrain_names, fix_seed)
+from src.datasets.dataset_sergey import WheatDataset
 from src.datasets.get_transforms import (get_train_transforms, get_transforms,
                                      get_valid_transforms, set_augmentations)
 
 warnings.filterwarnings('ignore')
 
-SEED = 42
-def seed_everything(seed):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
-seed_everything(SEED)
+fix_seed(1234)
 
 print(torch.__version__)
 print(neptune.__version__)
@@ -102,8 +92,6 @@ train_boxes_df = pd.read_csv(os.path.join(DATA_DIR, 'fixed_train.csv'))
 print('boxes original: ', len(train_boxes_df))
 
 train_images_df = pd.read_csv(os.path.join(DATA_DIR,'orig_alex_folds.csv'))
-#train_images_df = pd.read_csv(os.path.join(DATA_DIR, 'tanya_folds.csv'))
-
 train_boxes_df = preprocess_boxes(train_boxes_df)
 
 # filter tiny boxes 
@@ -177,7 +165,6 @@ class WheatDataset(Dataset):
             labels = np.full((1,), class_id)
 
         # to tensors
-        # https://github.com/rwightman/efficientdet-pytorch/blob/814bb96c90a616a20424d928b201969578047b4d/data/dataset.py#L77
         boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
         boxes = torch.as_tensor(boxes, dtype=torch.float)
         labels = torch.as_tensor(labels, dtype=torch.float)
@@ -224,7 +211,7 @@ class WheatDataset(Dataset):
         h, w = result_image.shape[:2]
         if h != 1024 or w != 1024:
             labels = np.full((len(boxes),), 1)
-            sample = get_resize_1024()(**{
+            sample = get_resize(1024)(**{
                 'image': result_image,
                 'bboxes': boxes,
                 'labels': labels
@@ -518,7 +505,7 @@ class ModelManager():
                 imgs = torch.stack(imgs)
                 imgs = imgs.to(self.device).float()
             
-                predicted = self.eval_model(imgs, torch.tensor([2] * len(imgs)).float().to(self.device))
+                predicted = self.eval_model(imgs, torch.tensor(int([2] * len(imgs))).float().to(self.device))
                 for i in range(len(imgs)):
                     cur_boxes = predicted[i].detach().cpu().numpy()[:, :4]
                     cur_boxes = np.array(cur_boxes, dtype=int)
@@ -586,7 +573,7 @@ class ModelManager():
                 loss, _, _ = self.train_model(batch_imgs, batch_boxes, batch_labels)
 
                 loss_value = loss.item()
-                # just slide average
+                # Slide average
                 current_loss = (current_loss * batch_idx + loss_value) / (batch_idx + 1)
         
         # validate loss        
@@ -696,9 +683,6 @@ def do_main():
     images_train = train_images_df.loc[
         (train_images_df[fold_column] != fold) & with_boxes_filter, image_id_column].values 
 
-    #images_train = train_images_df.loc[
-    #    (train_images_df[fold_column] != fold), image_id_column].values
-    #images_train = list(images_train) + list(negative_images) + list(spike_images)
     print(f'\nTrain images:{len(images_train)}, validation images {len(images_val)}')
 
     # get augs
@@ -706,14 +690,14 @@ def do_main():
 
     # get datasets
     train_dataset = WheatDataset(
-        image_ids = images_train, 
+        image_ids = images_train[:160], 
         image_dir = DIR_TRAIN, 
         boxes_df = train_boxes_df,
         transforms=get_train_transform(our_image_size), 
         is_test=False
     )
     valid_dataset = WheatDataset(
-        image_ids = images_val, 
+        image_ids = images_val[:160], 
         image_dir = DIR_TRAIN,    
         boxes_df = train_boxes_df,
         transforms=get_valid_transform(our_image_size), 

@@ -16,7 +16,7 @@ from effdet import (DetBenchEval, DetBenchTrain, EfficientDet,
 from effdet.efficientdet import HeadNet
 
 
-def set_seed(seed: int=1234) -> None:
+def fix_seed(seed: int=1234) -> None:
     """
     Fix all random seeds for reproducibility
     PyTorch
