@@ -21,6 +21,8 @@ clean:
 dataset:
 	docker exec wheat-dev bash scripts/download_dataset.sh
 
+folds:
+	docker exec wheat-dev python -m src.folds.make_folds
 # Run trainingd of EfficientDet 4 
 train:
 	docker exec wheat-dev bash scripts/train.sh
