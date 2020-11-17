@@ -1,6 +1,7 @@
 #!/bin/bash
 conda update -y conda
-conda create -y -n wheat python=3.7
+#conda create -y -n wheat python=3.7
+conda init bash
 conda activate wheat
 
 #pip install --upgrade pip
