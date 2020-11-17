@@ -16,5 +16,7 @@ torch>=1.4.0
 torchvision>=0.3.0
 tqdm>=4.25.0 
 ensemble-boxes
-flake8 
-mypy
+pylint >= 2.5.3
+mypy >= 0.782
+flake8 >= 3.8.3
+omegaconf>=2.0
