@@ -46,7 +46,7 @@ seed_everything(SEED)
 print(torch.__version__)
 print(neptune.__version__)
 
-DATA_DIR = '../../data'
+DATA_DIR = '../data'
 DIR_TRAIN = f'{DATA_DIR}/train'
 DIR_TEST = f'{DATA_DIR}/test'
 DIR_NEGATIVE = f'{DATA_DIR}/negative'
