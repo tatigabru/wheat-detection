@@ -25,7 +25,7 @@ from datasets.get_transforms import (get_train_transforms, get_transforms,
                                      get_valid_transforms, set_augmentations)
 from effdet import DetBenchTrain, EfficientDet, get_efficientdet_config
 from effdet.efficientdet import HeadNet
-from helpers.boxes_helpers import (filter_box_area, filter_box_size, get_box,
+from helpers.boxes_helpers import (filter_box_area, filter_box_size, get_boxes,
                                    preprocess_boxes)
 from helpers.metric import competition_metric, find_best_nms_threshold
 from helpers.model_helpers import (collate_fn, get_effdet_pretrain_names,

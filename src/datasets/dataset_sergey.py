@@ -99,7 +99,7 @@ class WheatDataset(Dataset):
     def load_cutmix_image_and_boxes(self, index, imsize=1024):
         """
         This implementation of cutmix author:  https://www.kaggle.com/nvnnghia
-        Refactoring and adaptation: https://www.kaggle.com/shonenkov
+        Refactored and adapted from: https://www.kaggle.com/shonenkov
         """
         w, h = imsize, imsize
         s = imsize // 2

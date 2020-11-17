@@ -451,8 +451,7 @@ class ModelManager():
             #if batch_idx == 0:
             #   print('first batch is', image_id)
             loss = self.train_on_batch(optimizer, imgs, labels, batch_idx)
-
-            # just slide average
+            # Slide average
             current_loss_mean = (current_loss_mean * batch_idx + loss) / (batch_idx + 1)
 
             tqdm_generator.set_description('loss: {:.4} lr:{:.6}'.format(
@@ -467,22 +466,17 @@ class ModelManager():
         batch_labels = [target['labels'].to(self.device) for target in batch_labels]
         loss, _, _ = self.train_model(batch_imgs, batch_boxes, batch_labels)
 
-        # If you are using a loss which is averaged over the training samples (which is the case most of the time),
+        # If a loss is averaged over the training samples,
         # you have to divide by the number of gradient accumulation steps
         loss = loss / grad_accum
-
         loss.backward()
 
+        # Accumulate gradients
         # https://gist.github.com/thomwolf/ac7a7da6b1888c2eeac8ac8b9b05d3d3
-        #if batch_idx % grad_accum == grad_accum - 1:
-        #    optimizer.step()
-        #    optimizer.zero_grad()
-        
-        # Wait for several backward steps
-        if (batch_idx + 1) % grad_accum == 0:
+        if batch_idx % grad_accum == grad_accum - 1:
             optimizer.step()
-            optimizer.zero_grad()    
-     
+            optimizer.zero_grad()
+
         return loss.item() * grad_accum
 
 
@@ -504,8 +498,8 @@ class ModelManager():
                     true_list.extend([gt['original_boxes'] for gt in true_targets])
                 imgs = torch.stack(imgs)
                 imgs = imgs.to(self.device).float()
-            
-                predicted = self.eval_model(imgs, torch.tensor(int([2] * len(imgs))).float().to(self.device))
+                predicted = self.eval_model(imgs).float().to(self.device)
+                predicted = self.eval_model(imgs, torch.tensor([2] * len(imgs)).float().to(self.device))
                 for i in range(len(imgs)):
                     cur_boxes = predicted[i].detach().cpu().numpy()[:, :4]
                     cur_boxes = np.array(cur_boxes, dtype=int)
@@ -571,7 +565,6 @@ class ModelManager():
                 batch_boxes = [target['boxes'].to(self.device) for target in batch_labels]
                 batch_labels = [target['labels'].to(self.device) for target in batch_labels]
                 loss, _, _ = self.train_model(batch_imgs, batch_boxes, batch_labels)
-
                 loss_value = loss.item()
                 # Slide average
                 current_loss = (current_loss * batch_idx + loss_value) / (batch_idx + 1)
@@ -651,19 +644,6 @@ def do_main():
     # Leave only > 0
     print('Leave only train images with boxes (validation)')
     with_boxes_filter = train_images_df[image_id_column].isin(train_boxes_df[image_id_column].unique())
-
-    #negative_images = enumerate_images(DIR_NEGATIVE)
-    #negative_images = [(negative_prefix + filename[:-4]) for filename in negative_images]
-    #negative_images.sort()
-    # take first 100 now...
-    #negative_images = negative_images[:100]
-
-    """
-    spike_images = enumerate_images(DIR_SPIKE)
-    spike_images = [(spike_dataset_prefix + filename[:-4]) for filename in spike_images]
-    spike_images.sort()
-    assert len(spike_images) > 0
-    """
 
     # config models fro train and validation
     config = get_efficientdet_config('tf_efficientdet_d5')
