@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 import neptune
 
-from ..helpers.metric import competition_metric
+from src.helpers.metric import competition_metric
 
 
 def get_lr(optimizer):
@@ -25,6 +25,7 @@ def set_lr(optimizer, new_lr):
 class ModelRunner():
     def __init__(self, model, device):
         self.model = model
+        #self.eval_model = eval_model
         self.device = device
 
 
@@ -57,29 +58,6 @@ class ModelRunner():
         return loss.item()
 
 
-    def predict(self, generator):
-        self.model.to(self.device)
-        self.model.eval()
-        tqdm_generator = tqdm(generator)
-        true_list = []
-        pred_boxes = []
-        pred_scores = []
-        for batch_idx, (imgs, true_targets, _) in enumerate(tqdm_generator):
-            if not (true_targets is None):
-                true_list.extend([2 * gt['boxes'].cpu().numpy() for gt in true_targets])
-            imgs = torch.stack(imgs)
-            imgs = imgs.to(self.device).float()
-            with torch.no_grad():
-                predicted = self.model(imgs, torch.tensor([2] * len(imgs)).float().cuda())
-                for i in range(len(imgs)):
-                    pred_boxes.append(predicted[i].detach().cpu().numpy()[:, :4])
-                    pred_scores.append(predicted[i].detach().cpu().numpy()[:, 4])
-            tqdm_generator.set_description('predict')
-        print(pred_scores)
-        #print(pred_boxes)
-        return true_list, pred_boxes, pred_scores
-
-
     def run_train(self, train_generator, val_generator, n_epoches, weights_file, factor, start_lr, min_lr,
                   lr_patience, overall_patience, loss_delta=0.):
         self.best_loss = 100
@@ -87,13 +65,12 @@ class ModelRunner():
         self.best_epoch = 0
         self.curr_lr_loss = 100
         self.best_lr_epoch = 0
-
         self.model.to(self.device)
         #params = [p for p in self.model.parameters() if p.requires_grad]
         optimizer = optim.AdamW(params=self.model.parameters(), lr=start_lr)
 
         for epoch in range(n_epoches):
-            print('!!!! Epoch {}'.format(epoch))
+            print(f'Epoch {epoch}')
             train_loss = self.train_epoch(optimizer, train_generator)
             print('Train loss:', train_loss)
             neptune.log_metric('Train loss', train_loss)
@@ -125,11 +102,11 @@ class ModelRunner():
         
         # validate metric
         nms_thr = 0.37
-        true_list, pred_boxes, pred_scores = self.predict(val_generator)
-        current_metric = competition_metric(true_list, pred_boxes, pred_scores, nms_thr)
-        print('\nValidation mAP', current_metric)
-        neptune.log_metric('Validation mAP', current_metric)
-        neptune.log_text('nms_threshold', str(nms_thr))
+        #true_list, pred_boxes, pred_scores = self.predict(val_generator)
+        #current_metric = competition_metric(true_list, pred_boxes, pred_scores, nms_thr)
+        #print('\nValidation mAP', current_metric)
+        #neptune.log_metric('Validation mAP', current_metric)
+        #neptune.log_text('nms_threshold', str(nms_thr))
 
         if current_loss < self.best_loss - loss_delta:
             print(f'\nLoss has been improved from {self.best_loss} to {current_loss}')
@@ -138,12 +115,6 @@ class ModelRunner():
             torch.save(self.model.model.state_dict(), f'{weights_file}_best_loss')
         else:
             print(f'\nLoss has not been improved from {self.best_loss}')            
-
-        if current_metric > self.best_metric:
-            print(f'\nmAP has been improved from {self.best_metric} to {current_metric}')   
-            self.best_metric = current_metric
-            self.best_epoch = epoch
-            torch.save(self.model.model.state_dict(), f'{weights_file}_best_map')
 
         if epoch - self.best_epoch > overall_patience:
             print('\nEarly stop: training finished with patience!')
